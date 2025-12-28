@@ -15,11 +15,13 @@ import {
   Briefcase,
   Zap,
   ChevronRight,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { LoanItem, LoanType } from '../types';
 import { formatCurrency, formatNumber } from '../utils/formatting';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Cell, Pie } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Pie, PieChart } from 'recharts';
 
 const LOAN_TYPE_CONFIG: Record<LoanType, { icon: React.ReactNode, color: string }> = {
   'Immobilien': { icon: <Building2 size={16} />, color: '#3b82f6' },
@@ -27,6 +29,25 @@ const LOAN_TYPE_CONFIG: Record<LoanType, { icon: React.ReactNode, color: string 
   'Investition': { icon: <Zap size={16} />, color: '#f59e0b' },
   'Förderung': { icon: <Percent size={16} />, color: '#8b5cf6' },
   'Sonstiges': { icon: <CreditCard size={16} />, color: '#64748b' }
+};
+
+// Eigener Tooltip für ein schöneres Erlebnis
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Jahr {label}</p>
+        <p className="text-sm font-black text-white">{formatCurrency(payload[0].value)}</p>
+        <div className="mt-2 h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+           <div 
+             className="h-full bg-blue-500 transition-all duration-500" 
+             style={{ width: `${(payload[0].value / payload[0].payload.initialAmount) * 100}%` }}
+           />
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 export const CreditCalculatorView: React.FC = () => {
@@ -40,21 +61,36 @@ export const CreditCalculatorView: React.FC = () => {
       amount: 85000, interestRate: 4.2, durationYears: 5, installmentsPerYear: 12, startDate: '2024-05-01' 
     }
   ]);
+  
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(loans[0]?.id || null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  
+  const [newLoan, setNewLoan] = useState<Omit<LoanItem, 'id'>>({
+    name: '',
+    type: 'Investition',
+    amount: 50000,
+    interestRate: 3.5,
+    durationYears: 10,
+    installmentsPerYear: 12,
+    startDate: new Date().toISOString().split('T')[0]
+  });
 
-  const addLoan = () => {
-    const newLoan: LoanItem = {
-      id: Date.now().toString(),
-      name: 'Neue Finanzierung',
+  const handleAddLoan = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = Date.now().toString();
+    const loanToAdd = { ...newLoan, id };
+    setLoans([...loans, loanToAdd]);
+    setSelectedLoanId(id);
+    setShowAddModal(false);
+    setNewLoan({
+      name: '',
       type: 'Investition',
-      amount: 100000,
+      amount: 50000,
       interestRate: 3.5,
       durationYears: 10,
       installmentsPerYear: 12,
       startDate: new Date().toISOString().split('T')[0]
-    };
-    setLoans([...loans, newLoan]);
-    setSelectedLoanId(newLoan.id);
+    });
   };
 
   const updateLoan = (id: string, updates: Partial<LoanItem>) => {
@@ -81,7 +117,15 @@ export const CreditCalculatorView: React.FC = () => {
       const principal = annuity - interest;
       remainingBalance -= principal;
       totalInterest += interest;
-      schedule.push({ period: i, annuity, interest, principal, remainingBalance: Math.max(0, remainingBalance) });
+      schedule.push({ 
+        period: i, 
+        year: Math.floor((i - 1) / loan.installmentsPerYear) + 1,
+        annuity, 
+        interest, 
+        principal, 
+        remainingBalance: Math.max(0, remainingBalance),
+        initialAmount: loan.amount
+      });
     }
 
     return { annuity, totalInterest, totalPayment: loan.amount + totalInterest, schedule };
@@ -114,6 +158,32 @@ export const CreditCalculatorView: React.FC = () => {
   const selectedLoan = loans.find(l => l.id === selectedLoanId);
   const selectedCalculation = selectedLoan ? calculateLoan(selectedLoan) : null;
 
+  // Chart-Daten auf Jahresbasis aufbereiten für die Grafik
+  const chartData = useMemo(() => {
+    if (!selectedCalculation || !selectedLoan) return [];
+    // Wir nehmen den Wert am Ende jedes Jahres
+    const yearlyPoints = [];
+    // Startwert hinzufügen
+    yearlyPoints.push({
+      year: 0,
+      remainingBalance: selectedLoan.amount,
+      initialAmount: selectedLoan.amount
+    });
+    
+    for (let y = 1; y <= selectedLoan.durationYears; y++) {
+      const lastMonthOfYear = y * selectedLoan.installmentsPerYear;
+      const point = selectedCalculation.schedule[lastMonthOfYear - 1];
+      if (point) {
+        yearlyPoints.push({
+          year: y,
+          remainingBalance: point.remainingBalance,
+          initialAmount: selectedLoan.amount
+        });
+      }
+    }
+    return yearlyPoints;
+  }, [selectedCalculation, selectedLoan]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
       {/* Header */}
@@ -127,12 +197,15 @@ export const CreditCalculatorView: React.FC = () => {
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium italic pl-11">Konsolidierte Ansicht aller Unternehmenskredite</p>
         </div>
-        <button onClick={addLoan} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all shadow-xl shadow-blue-500/20 active:scale-95">
+        <button 
+          onClick={() => setShowAddModal(true)} 
+          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl text-xs font-black flex items-center gap-2 transition-all shadow-xl shadow-blue-500/20 active:scale-95"
+        >
           <Plus size={16} /> Finanzierung hinzufügen
         </button>
       </div>
 
-      {/* Portfolio Dashboard KPIs */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { label: 'Gesamtobligo', value: formatCurrency(portfolioMetrics.totalOutstanding), color: 'text-slate-900 dark:text-white', sub: 'Aktuelles Kapital' },
@@ -149,7 +222,6 @@ export const CreditCalculatorView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Loan List & Selection */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
@@ -207,14 +279,13 @@ export const CreditCalculatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Detailed Calculator for Selected Loan */}
         <div className="lg:col-span-8 space-y-6">
           {selectedLoan && selectedCalculation ? (
             <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in duration-300">
               <div className="flex flex-col md:flex-row justify-between gap-6 mb-8 pb-8 border-b border-slate-100 dark:border-slate-800">
                 <div className="space-y-4 flex-1">
                    <div className="space-y-1">
-                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Finanzierungs-Bezeichnung</label>
+                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Finanzierungs-Bezeichnung</label>
                      <input 
                       className="w-full bg-transparent text-xl font-black text-slate-900 dark:text-white border-none p-0 focus:ring-0"
                       value={selectedLoan.name}
@@ -223,88 +294,112 @@ export const CreditCalculatorView: React.FC = () => {
                    </div>
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Zins (%)</label>
-                        <input type="number" step="0.1" className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2 font-bold text-sm" value={selectedLoan.interestRate} onChange={(e) => updateLoan(selectedLoan.id, { interestRate: Number(e.target.value) })} />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Zins (%)</label>
+                        <input type="number" step="0.1" className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-3 font-bold text-sm" value={selectedLoan.interestRate} onChange={(e) => updateLoan(selectedLoan.id, { interestRate: Number(e.target.value) })} />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Laufzeit (J)</label>
-                        <input type="number" className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-2 font-bold text-sm" value={selectedLoan.durationYears} onChange={(e) => updateLoan(selectedLoan.id, { durationYears: Number(e.target.value) })} />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Laufzeit (Jahre)</label>
+                        <input type="number" className="w-full bg-slate-50 dark:bg-slate-800 rounded-xl p-3 font-bold text-sm" value={selectedLoan.durationYears} onChange={(e) => updateLoan(selectedLoan.id, { durationYears: Number(e.target.value) })} />
                       </div>
                    </div>
                 </div>
-                <div className="bg-blue-600 p-8 rounded-[32px] text-white flex flex-col justify-center min-w-[240px]">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Rate / Monat</p>
+                <div className="bg-blue-600 p-8 rounded-[32px] text-white flex flex-col justify-center min-w-[260px] shadow-xl shadow-blue-500/20">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-2">Annuität / Monat</p>
                   <h4 className="text-3xl font-black">{formatCurrency(selectedCalculation.annuity * (selectedLoan.installmentsPerYear / 12))}</h4>
                   <div className="mt-4 flex items-center gap-2 text-[10px] font-bold">
-                    <Calendar size={12} /> Startet am {selectedLoan.startDate}
+                    <Calendar size={12} className="opacity-60" /> 
+                    <span>Startdatum: <span className="opacity-100">{selectedLoan.startDate}</span></span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                   <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6">Restschuld-Verlauf</h3>
-                   <div className="h-48 w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="space-y-6">
+                   <div className="flex justify-between items-center">
+                      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Restschuld-Verlauf (Entwicklung)</h3>
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">linear reduziert</span>
+                   </div>
+                   <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={selectedCalculation.schedule.filter((_, idx) => idx % selectedLoan.installmentsPerYear === 0)}>
+                      <AreaChart data={chartData}>
                         <defs>
-                          <linearGradient id="colorLoan" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                          <linearGradient id="colorDebt" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.1}/>
                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="period" hide />
-                        <Tooltip contentStyle={{ borderRadius: '12px' }} />
-                        <Area type="monotone" dataKey="remainingBalance" name="Restschuld" stroke="#3b82f6" fillOpacity={1} fill="url(#colorLoan)" strokeWidth={3} />
+                        <XAxis 
+                          dataKey="year" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
+                          label={{ value: 'Jahre', position: 'insideBottom', offset: -5, fontSize: 8, fontWeight: 900, fill: '#cbd5e1' }}
+                        />
+                        <YAxis hide domain={[0, 'dataMax + 10000']} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                        <Area 
+                          type="monotone" 
+                          dataKey="remainingBalance" 
+                          stroke="#3b82f6" 
+                          strokeWidth={4}
+                          fillOpacity={1} 
+                          fill="url(#colorDebt)" 
+                          animationDuration={1500}
+                        />
                       </AreaChart>
                     </ResponsiveContainer>
                    </div>
                 </div>
-                <div>
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Finanzierungsdetails</h3>
+                
+                <div className="space-y-6">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kostenanalyse & Rückzahlung</h3>
                   <div className="space-y-4">
                     {[
-                      { label: 'Darlehensbetrag', value: formatCurrency(selectedLoan.amount), icon: <Euro size={14} /> },
-                      { label: 'Zinskosten (Laufzeit)', value: formatCurrency(selectedCalculation.totalInterest), icon: <TrendingDown size={14} className="text-red-500" /> },
-                      { label: 'Gesamt-Rückzahlung', value: formatCurrency(selectedCalculation.totalPayment), icon: <Zap size={14} className="text-amber-500" /> },
+                      { label: 'Darlehensbetrag', value: formatCurrency(selectedLoan.amount), icon: <Euro size={14} />, color: 'bg-blue-50 text-blue-600' },
+                      { label: 'Zinskosten (gesamt)', value: formatCurrency(selectedCalculation.totalInterest), icon: <TrendingDown size={14} />, color: 'bg-red-50 text-red-500' },
+                      { label: 'Gesamt-Belastung', value: formatCurrency(selectedCalculation.totalPayment), icon: <Zap size={14} />, color: 'bg-amber-50 text-amber-500' },
                     ].map((item, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400">{item.icon}</span>
-                          <span className="text-[11px] font-bold text-slate-500">{item.label}</span>
+                      <div key={i} className="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-xl ${item.color}`}>{item.icon}</div>
+                          <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">{item.label}</span>
                         </div>
-                        <span className="text-xs font-black text-slate-900 dark:text-white">{item.value}</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{item.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8">
-                <div className="flex justify-between items-center mb-4">
-                   <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tilgungsplan</h3>
-                   <button className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline">
-                     <Download size={12} /> Excel Tilgungsplan
+              <div className="mt-12">
+                <div className="flex justify-between items-center mb-6">
+                   <div className="flex items-center gap-2">
+                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tilgungsplan Detail</h3>
+                     <span className="text-[9px] font-bold text-slate-400 italic">(Auszug erste 24 Perioden)</span>
+                   </div>
+                   <button className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all border border-blue-100">
+                     <Download size={14} /> Excel Export
                    </button>
                 </div>
-                <div className="max-h-40 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-800 rounded-2xl">
+                <div className="max-h-48 overflow-y-auto custom-scrollbar rounded-2xl border border-slate-100 dark:border-slate-800">
                    <table className="w-full text-[10px]">
                      <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700">
                         <tr>
-                          <th className="p-3 text-left">P</th>
-                          <th className="p-3 text-right">Zins</th>
-                          <th className="p-3 text-right">Tilgung</th>
-                          <th className="p-3 text-right">Rest</th>
+                          <th className="p-4 text-left">Monat</th>
+                          <th className="p-4 text-right">Zinsanteil</th>
+                          <th className="p-4 text-right">Tilgungsanteil</th>
+                          <th className="p-4 text-right bg-slate-100/30">Restschuld</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50 dark:divide-slate-800 font-medium">
                         {selectedCalculation.schedule.slice(0, 24).map(s => (
-                          <tr key={s.period}>
-                            <td className="p-3 text-slate-400">{s.period}</td>
-                            <td className="p-3 text-right text-red-500">{formatNumber(s.interest)}</td>
-                            <td className="p-3 text-right text-emerald-600 font-bold">{formatNumber(s.principal)}</td>
-                            <td className="p-3 text-right font-black">{formatNumber(s.remainingBalance)}</td>
+                          <tr key={s.period} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                            <td className="p-4 text-slate-400 font-bold">{s.period}. Monat</td>
+                            <td className="p-4 text-right text-red-500">{formatNumber(s.interest)} €</td>
+                            <td className="p-4 text-right text-emerald-600 font-bold">{formatNumber(s.principal)} €</td>
+                            <td className="p-4 text-right font-black bg-slate-50/20">{formatNumber(s.remainingBalance)} €</td>
                           </tr>
                         ))}
                      </tbody>
@@ -314,15 +409,126 @@ export const CreditCalculatorView: React.FC = () => {
             </div>
           ) : (
             <div className="h-[600px] flex flex-col items-center justify-center text-center p-20 bg-slate-50 dark:bg-slate-900/30 rounded-[40px] border-2 border-dashed border-slate-200 dark:border-slate-800">
-               <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 mb-6">
-                 <CreditCard size={40} />
+               <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-[32px] shadow-xl flex items-center justify-center text-slate-300 mb-8 border border-slate-100 dark:border-slate-700">
+                 <CreditCard size={48} className="animate-pulse" />
                </div>
-               <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">Kein Kredit ausgewählt</h3>
-               <p className="text-sm text-slate-400 max-w-xs">Wählen Sie eine Finanzierung aus der Liste oder legen Sie eine neue an, um die Details zu berechnen.</p>
+               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Keine Auswahl aktiv</h3>
+               <p className="text-sm text-slate-400 max-w-sm leading-relaxed">Bitte wählen Sie links eine bestehende Finanzierung aus oder erfassen Sie eine neue Investition über den Button oben rechts.</p>
             </div>
           )}
         </div>
       </div>
+
+      {/* --- ADD LOAN MODAL --- */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity" onClick={() => setShowAddModal(false)}></div>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[40px] shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-800">
+            <div className="p-10 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-5">
+                <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-2xl shadow-blue-500/20">
+                  <Plus size={28} strokeWidth={3} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">Finanzierung anlegen</h3>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Grundparameter definieren</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="p-3 hover:bg-white dark:hover:bg-slate-800 rounded-2xl text-slate-400 transition-all border border-transparent hover:border-slate-200">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddLoan} className="p-10 space-y-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Name der Finanzierung</label>
+                <input 
+                  required
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-5 text-sm font-black outline-none dark:text-white focus:ring-4 focus:ring-blue-500/10 transition-all"
+                  placeholder="z.B. IT-Infrastruktur 2025"
+                  value={newLoan.name}
+                  onChange={(e) => setNewLoan({...newLoan, name: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Kategorie</label>
+                  <select 
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-5 text-sm font-bold outline-none dark:text-white"
+                    value={newLoan.type}
+                    onChange={(e) => setNewLoan({...newLoan, type: e.target.value as LoanType})}
+                  >
+                    {Object.keys(LOAN_TYPE_CONFIG).map(type => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Auszahlungsdatum</label>
+                  <input 
+                    type="date"
+                    required
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-5 py-5 text-sm font-bold outline-none dark:text-white"
+                    value={newLoan.startDate}
+                    onChange={(e) => setNewLoan({...newLoan, startDate: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50/50 dark:bg-blue-900/10 p-8 rounded-[32px] border border-blue-100 dark:border-blue-900/30 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">Netto-Darlehensbetrag (€)</label>
+                  <div className="relative">
+                    <Euro className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-300" size={20} />
+                    <input 
+                      type="number"
+                      required
+                      className="w-full bg-white dark:bg-slate-950 border-2 border-blue-200 dark:border-blue-900/50 rounded-2xl pl-14 pr-6 py-5 text-xl font-black text-blue-600 outline-none shadow-sm focus:border-blue-500"
+                      value={newLoan.amount}
+                      onChange={(e) => setNewLoan({...newLoan, amount: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">Nominalzins (%)</label>
+                    <div className="relative">
+                      <Percent className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-300" size={18} />
+                      <input 
+                        type="number" step="0.1"
+                        required
+                        className="w-full bg-white dark:bg-slate-950 border-2 border-blue-200 dark:border-blue-900/50 rounded-2xl pl-14 pr-6 py-4 text-base font-black text-blue-600 outline-none"
+                        value={newLoan.interestRate}
+                        onChange={(e) => setNewLoan({...newLoan, interestRate: Number(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-blue-600 dark:text-blue-400">Laufzeit (Jahre)</label>
+                    <div className="relative">
+                      <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-300" size={18} />
+                      <input 
+                        type="number"
+                        required
+                        className="w-full bg-white dark:bg-slate-950 border-2 border-blue-200 dark:border-blue-900/50 rounded-2xl pl-14 pr-6 py-4 text-base font-black text-blue-600 outline-none"
+                        value={newLoan.durationYears}
+                        onChange={(e) => setNewLoan({...newLoan, durationYears: Number(e.target.value)})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl text-xs font-black text-slate-500 transition-all uppercase tracking-widest">Abbrechen</button>
+                <button type="submit" className="flex-[2] py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-black shadow-xl shadow-blue-500/20 transition-all flex items-center justify-center gap-3 uppercase tracking-widest">
+                  <CheckCircle2 size={20} /> Datensatz speichern
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

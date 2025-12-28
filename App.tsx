@@ -12,7 +12,6 @@ import { ForecastView } from './components/ForecastView';
 import { DashboardView } from './components/DashboardView';
 import { SettingsView } from './components/SettingsView';
 import { ResourcePlanningView } from './components/ResourcePlanningView';
-import { PersonnelResourcePlanningView } from './components/PersonnelResourcePlanningView';
 import { CreditCalculatorView } from './components/CreditCalculatorView';
 import { InvestmentPlanningView } from './components/InvestmentPlanningView';
 import { EntrepreneurPlanningView } from './components/EntrepreneurPlanningView';
@@ -25,7 +24,8 @@ import {
   AppTab, Client, AppSettings, Analysis
 } from './types';
 import { calculateKeyFigures, distributeYearly } from './utils/calculations';
-import { Loader2 } from 'lucide-react';
+import { generateExcelReport, triggerPdfExport } from './utils/export';
+import { Loader2, Hexagon, FileText, Globe, ShieldCheck, MapPin } from 'lucide-react';
 
 const INITIAL_SECTIONS: PlanSection[] = [
   { id: 'rev', label: 'Umsatz', orderIndex: 0, type: 'REVENUE', isCollapsible: true, items: [{ id: 'rev-1', sectionId: 'rev', accountNumber: '4000', label: 'Umsatz Dienstleistungen', orderIndex: 0, type: LineItemType.Revenue, isCustom: false, values: distributeYearly(240000) }, { id: 'rev-2', sectionId: 'rev', accountNumber: '4001', label: 'Umsatz Material', orderIndex: 1, type: LineItemType.Revenue, isCustom: false, values: distributeYearly(60000) }] },
@@ -99,25 +99,24 @@ const App: React.FC = () => {
     setClientAnalyses(prev => ({ ...prev, [selectedClientId]: [...(prev[selectedClientId] || []), newAnalysis] }));
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Abmeldung fehlgeschlagen:', error);
+  const handleExport = (modules: string[], format: 'pdf' | 'excel') => {
+    if (!activeAnalysis) return;
+    if (format === 'excel') {
+      generateExcelReport({ client: activeClient, analysis: activeAnalysis, selectedModules: modules });
+    } else {
+      triggerPdfExport();
     }
   };
 
-  if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><Loader2 className="text-blue-600 animate-spin" size={48} /></div>;
-  }
+  const handleLogout = async () => {
+    try { await signOut(auth); } catch (error) { console.error(error); }
+  };
 
-  if (!currentUser || !currentUser.emailVerified) {
-    return <AuthView />;
-  }
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><Loader2 className="text-blue-600 animate-spin" size={48} /></div>;
+  if (!currentUser || !currentUser.emailVerified) return <AuthView />;
 
   const renderContent = () => {
     if (!activeAnalysis) return <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest">Keine Daten verfügbar</div>;
-
     switch (activeTab) {
       case 'dashboard': return <DashboardView clients={clients} onSelectClient={setSelectedClientId} onAddClient={(d) => setClients(prev => [...prev, { ...d, id: Date.now().toString(), tenantId: 't1', status: 'Neu', lastActivity: 'Gerade eben' } as Client])} onUpdateClient={(id, u) => setClients(prev => prev.map(c => c.id === id ? {...c, ...u} : c))} />;
       case 'planrechnung': return <div className="space-y-6 animate-in fade-in duration-300"><FinancialSummary metrics={{ revenue: keyFigures.revenue, db1: keyFigures.db1, ebitda: keyFigures.ebitda, result: keyFigures.result }} /><PlanrechnungTable sections={activeAnalysis.planData} onUpdateSections={handleUpdateSections} clientName={activeClient.name} year={2024} /></div>;
@@ -138,25 +137,131 @@ const App: React.FC = () => {
   return (
     <Layout activeClient={activeClient} activeTenant="Kanzlei-Portal" clients={clients} onSelectClient={setSelectedClientId}
       headerContent={
-        <Header 
-          activeClient={activeClient} 
-          clients={clients} 
-          onSelectClient={setSelectedClientId} 
-          analyses={analyses} 
-          activeAnalysisId={activeAnalysis?.id || ''} 
-          onSelectAnalysis={() => {}} 
-          onCreateAnalysis={handleCreateAnalysis} 
-          onDuplicateAnalysis={() => {}} 
-          onDeleteAnalysis={() => {}}
-          currentUser={currentUser}
-        />
+        <Header activeClient={activeClient} clients={clients} onSelectClient={setSelectedClientId} analyses={analyses} activeAnalysisId={activeAnalysis?.id || ''} onSelectAnalysis={() => {}} onCreateAnalysis={handleCreateAnalysis} onDuplicateAnalysis={() => {}} onDeleteAnalysis={() => {}} currentUser={currentUser} onExport={handleExport} />
       }
     >
       <Sidebar activeTab={activeTab} onNavigate={setActiveTab} onLogout={handleLogout} currentUser={currentUser} />
       <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar print:hidden">
           {renderContent()}
         </div>
+      </div>
+
+      {/* --- PROFESSIONELLES REPORTING-DOSSIER (PRINT ONLY) --- */}
+      <div className="hidden print:block print-only bg-white text-slate-900 min-h-screen">
+        
+        {/* PAGE 1: DECKBLATT */}
+        <section className="h-[297mm] flex flex-col justify-between p-20 border-b border-slate-100">
+          <div className="flex justify-between items-start">
+             <div className="flex items-center gap-4">
+                <div className="p-4 bg-blue-600 rounded-2xl text-white">
+                  <Hexagon size={40} fill="currentColor" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-black tracking-tighter">plan4selbst.at</h1>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Business Intelligence Portal</p>
+                </div>
+             </div>
+             <div className="text-right">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Bericht-ID</p>
+                <p className="text-sm font-mono font-bold">PR-2024-{activeClient.id}-{Date.now().toString().slice(-6)}</p>
+             </div>
+          </div>
+
+          <div className="space-y-10">
+             <div className="h-2 w-32 bg-blue-600 rounded-full" />
+             <div className="space-y-4">
+                <h2 className="text-[12px] font-black text-blue-600 uppercase tracking-[0.4em]">Wirtschaftliches Gutachten</h2>
+                <h3 className="text-7xl font-black tracking-tighter leading-none">{activeClient.name}</h3>
+                <p className="text-2xl font-light text-slate-400 italic">Unternehmensplanung & Prognose für das Geschäftsjahr 2024</p>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-20 border-t border-slate-100 pt-16">
+             <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <Globe size={18} className="text-slate-400" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-slate-400">Mandantensitz</p>
+                    <p className="text-sm font-bold">Österreich / {activeClient.industry}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={18} className="text-slate-400" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase text-slate-400">Prüfungsstatus</p>
+                    <p className="text-sm font-bold">Vollständig kalkuliert (Auto-Compute)</p>
+                  </div>
+                </div>
+             </div>
+             <div className="text-right">
+                <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Erstellt durch</p>
+                <p className="text-lg font-black">{currentUser?.displayName?.split('||')[1] || 'Fachkanzlei für BI'}</p>
+                <p className="text-sm text-slate-500">{new Date().toLocaleDateString('de-AT', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+             </div>
+          </div>
+        </section>
+
+        {/* PAGE 2: MANAGEMENT SUMMARY */}
+        <section className="page-break p-16 space-y-12">
+          <div className="flex justify-between items-end border-b-2 border-slate-900 pb-8">
+             <h2 className="text-2xl font-black uppercase tracking-tight">01. Management Summary</h2>
+             <span className="text-xs font-bold text-slate-400">Werte in Euro (€)</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+             <div className="p-10 bg-slate-50 rounded-[40px] border border-slate-100 space-y-4">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Proj. Jahresergebnis (EGT)</p>
+                <p className="text-5xl font-black text-blue-600">{new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(keyFigures.result)}</p>
+                <p className="text-sm text-slate-500 leading-relaxed font-medium">Dies entspricht einer prognostizierten Umsatzrendite von <span className="font-bold text-slate-900">{((keyFigures.result/keyFigures.revenue)*100).toFixed(1)}%</span> bezogen auf den geplanten Gesamtumsatz.</p>
+             </div>
+             <div className="p-10 bg-slate-900 rounded-[40px] text-white space-y-4">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Operativer Cashflow (EBITDA)</p>
+                <p className="text-5xl font-black text-emerald-400">{new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(keyFigures.ebitda)}</p>
+                <p className="text-sm text-slate-400 leading-relaxed">Die Liquiditätsbasis vor Abschreibungen und Zinsen sichert die Schuldendienstfähigkeit des Unternehmens nachhaltig ab.</p>
+             </div>
+          </div>
+
+          <div className="bg-white border-2 border-slate-100 rounded-[40px] p-10 space-y-8">
+             <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
+               <div className="w-2 h-2 bg-blue-600 rounded-full" /> Wesentliche Planungsprämissen
+             </h3>
+             <div className="grid grid-cols-3 gap-10">
+                <div>
+                   <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Umsatzanteil Material</p>
+                   <p className="text-xl font-bold">{((keyFigures.material/keyFigures.revenue)*100).toFixed(1)}%</p>
+                </div>
+                <div>
+                   <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Personalkostenquote</p>
+                   <p className="text-xl font-bold">{((keyFigures.personnel/keyFigures.revenue)*100).toFixed(1)}%</p>
+                </div>
+                <div>
+                   <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Gesamt-Fixkostenlast</p>
+                   <p className="text-xl font-bold">{new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' }).format(keyFigures.totalFixedCosts)}</p>
+                </div>
+             </div>
+          </div>
+        </section>
+
+        {/* PAGE 3: DETAILPLANUNG (Scaled Table) */}
+        <section className="page-break p-10 space-y-8">
+           <div className="flex justify-between items-center border-b border-slate-200 pb-6">
+              <h2 className="text-xl font-black uppercase tracking-tight">02. Detaillierte Planerfolgsrechnung 2024</h2>
+              <div className="flex gap-4 text-[10px] font-black uppercase text-slate-400">
+                <span>Methodik: {activeClient.profitMethod}</span>
+                <span>Analyse: {activeAnalysis.name}</span>
+              </div>
+           </div>
+
+           <div className="print-table-scale">
+             <ReportsView activeClient={activeClient} activeAnalysis={activeAnalysis} />
+           </div>
+        </section>
+
+        <footer className="fixed bottom-10 left-0 right-0 px-20 flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-[0.3em]">
+           <span>plan4selbst.at // Certified Reporting</span>
+           <span>Seite 3 / 3</span>
+        </footer>
       </div>
     </Layout>
   );
