@@ -1,0 +1,5 @@
+{
+  "name": "plan4selbst.at",
+  "description": "Multi-tenant B2B SaaS for Austrian tax advisors and SMEs. Features hierarchical financial planning (Planrechnung) with real-time recalculations and Austrian tax specifics.",
+  "requestFramePermissions": []
+}
