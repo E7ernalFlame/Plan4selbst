@@ -65,7 +65,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // Wichtig: Nur Benutzer mit verifizierter E-Mail zulassen
       setCurrentUser(user);
       setAuthLoading(false);
     });
@@ -109,14 +108,9 @@ const App: React.FC = () => {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="text-blue-600 animate-spin" size={48} />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950"><Loader2 className="text-blue-600 animate-spin" size={48} /></div>;
   }
 
-  // ZUGRIFFSSCHUTZ: Nur eingeloggte UND verifizierte Benutzer kommen rein
   if (!currentUser || !currentUser.emailVerified) {
     return <AuthView />;
   }
@@ -125,29 +119,9 @@ const App: React.FC = () => {
     if (!activeAnalysis) return <div className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest">Keine Daten verfügbar</div>;
 
     switch (activeTab) {
-      case 'dashboard': return (
-        <DashboardView 
-          clients={clients} 
-          onSelectClient={setSelectedClientId} 
-          onAddClient={(d) => setClients(prev => [...prev, { ...d, id: Date.now().toString(), tenantId: 't1', status: 'Neu', lastActivity: 'Gerade eben' } as Client])} 
-          onUpdateClient={(id, u) => setClients(prev => prev.map(c => c.id === id ? {...c, ...u} : c))} 
-        />
-      );
-      case 'planrechnung': return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <FinancialSummary metrics={{ revenue: keyFigures.revenue, db1: keyFigures.db1, ebitda: keyFigures.ebitda, result: keyFigures.result }} />
-          <PlanrechnungTable sections={activeAnalysis.planData} onUpdateSections={handleUpdateSections} clientName={activeClient.name} year={2024} />
-        </div>
-      );
-      case 'prognose': return (
-        <ForecastView 
-          sections={activeAnalysis.planData} 
-          allScenarios={{'Basisplan': activeAnalysis.planData}} 
-          baseYear={2024} 
-          rates={forecastRates} 
-          onUpdateRates={setForecastRates} 
-        />
-      );
+      case 'dashboard': return <DashboardView clients={clients} onSelectClient={setSelectedClientId} onAddClient={(d) => setClients(prev => [...prev, { ...d, id: Date.now().toString(), tenantId: 't1', status: 'Neu', lastActivity: 'Gerade eben' } as Client])} onUpdateClient={(id, u) => setClients(prev => prev.map(c => c.id === id ? {...c, ...u} : c))} />;
+      case 'planrechnung': return <div className="space-y-6 animate-in fade-in duration-300"><FinancialSummary metrics={{ revenue: keyFigures.revenue, db1: keyFigures.db1, ebitda: keyFigures.ebitda, result: keyFigures.result }} /><PlanrechnungTable sections={activeAnalysis.planData} onUpdateSections={handleUpdateSections} clientName={activeClient.name} year={2024} /></div>;
+      case 'prognose': return <ForecastView sections={activeAnalysis.planData} allScenarios={{'Basisplan': activeAnalysis.planData}} baseYear={2024} rates={forecastRates} onUpdateRates={setForecastRates} />;
       case 'ressourcen': return <ResourcePlanningView />;
       case 'personal': return <PersonnelPlanningView />;
       case 'investition': return <InvestmentPlanningView />;
@@ -156,17 +130,16 @@ const App: React.FC = () => {
       case 'tax-calculator': return <TaxCalculatorView />;
       case 'auswertungen': return <ReportsView activeClient={activeClient} activeAnalysis={activeAnalysis} />;
       case 'kreditfaehigkeit': return <CreditCapacityView activeAnalysis={activeAnalysis} />;
-      case 'einstellungen': return <SettingsView settings={settings} onUpdateSettings={(u) => setSettings(prev => ({...prev, ...u}))} />;
+      case 'einstellungen': return <SettingsView settings={settings} onUpdateSettings={(u) => setSettings(prev => ({...prev, ...u}))} currentUser={currentUser} />;
       default: return <div className="p-10 text-center text-slate-400">Modul wird geladen...</div>;
     }
   };
 
   return (
-    <Layout activeClient={activeClient} activeTenant="Hager & Partner StB" clients={clients} onSelectClient={setSelectedClientId}
+    <Layout activeClient={activeClient} activeTenant="Kanzlei-Portal" clients={clients} onSelectClient={setSelectedClientId}
       headerContent={
         <Header 
           activeClient={activeClient} 
-          activeTenant="Hager & Partner StB" 
           clients={clients} 
           onSelectClient={setSelectedClientId} 
           analyses={analyses} 
@@ -175,11 +148,11 @@ const App: React.FC = () => {
           onCreateAnalysis={handleCreateAnalysis} 
           onDuplicateAnalysis={() => {}} 
           onDeleteAnalysis={() => {}}
-          onLogout={handleLogout}
+          currentUser={currentUser}
         />
       }
     >
-      <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
+      <Sidebar activeTab={activeTab} onNavigate={setActiveTab} onLogout={handleLogout} currentUser={currentUser} />
       <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           {renderContent()}
