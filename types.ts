@@ -5,7 +5,6 @@ export enum UserRole {
   Mandant = 'Mandant'
 }
 
-// Added UserProfile interface to support user state and role management in App.tsx
 export interface UserProfile {
   id: string;
   name: string;
@@ -16,7 +15,8 @@ export interface UserProfile {
 export enum ProfitMethod {
   UGB = 'Betriebsvermögensvergleich (UGB)',
   EAR = 'Einnahmen-Ausgaben-Rechnung (EAR)',
-  Pauschalierung = 'Pauschalierung'
+  Pauschalierung = 'Pauschalierung',
+  Custom = 'Sonstiges'
 }
 
 export type LoanType = 'Immobilien' | 'Betriebsmittel' | 'Investition' | 'Förderung' | 'Sonstiges';
@@ -39,13 +39,19 @@ export interface InvestmentItem {
   label: string;
   category: AssetCategory;
   cost: number;
-  usefulLife: number; // ND in Jahren
-  acquisitionDate: string; // Format YYYY-MM-DD
+  usefulLife: number; 
+  acquisitionDate: string; 
   type: 'Altbestand' | 'Neuzugang';
   isGWG?: boolean;
 }
 
 export type OnboardingStatus = 'Neu' | 'In Bearbeitung' | 'Aktiv' | 'Archiviert';
+
+export interface CustomField {
+  id: string;
+  label: string;
+  value: string;
+}
 
 export interface Client {
   id: string;
@@ -53,24 +59,29 @@ export interface Client {
   name: string;
   legalForm: string;
   industry: string;
+  primaryContact?: string;
   taxId?: string;
   uidNumber?: string; 
   commercialRegisterNumber?: string;
   registeredAddress?: string;
   contactEmail: string;
   assignedAdvisor: string;
-  profitMethod: ProfitMethod;
+  profitMethod: ProfitMethod | string;
   status: OnboardingStatus;
   portalAccess: 'Inaktiv' | 'Eingeladen' | 'Aktiv';
   lastActivity: string;
   lastLogin?: string;
+  internalNotes?: string;
+  customFields?: CustomField[];
 }
 
 export interface Analysis {
   id: string;
+  clientId: string; 
   name: string;
   createdAt: string;
   status: 'Entwurf' | 'Final' | 'Probe';
+  notes?: string; // Neu: Notizen zur Dokumentation der Planungslogik
   planData: PlanSection[];
   personnelResources: PersonnelResourceItem[];
   investments: InvestmentItem[];
@@ -159,10 +170,6 @@ export interface PlanSection {
   items: PlanLineItem[];
 }
 
-export type ScenarioModifiers = {
-  [key in SectionType]?: number; 
-};
-
 export interface ForecastGrowthRates {
   REVENUE: number;
   MATERIAL: number;
@@ -172,7 +179,7 @@ export interface ForecastGrowthRates {
   TAX: number;
 }
 
-export type ViewMode = 'monthly' | 'forecast';
+export type ScenarioModifiers = Partial<Record<SectionType, number>>;
 
 export type AppTab = 'dashboard' | 'planrechnung' | 'prognose' | 'ressourcen' | 'personal' | 'investition' | 'kredit' | 'entrepreneur' | 'tax-calculator' | 'auswertungen' | 'einstellungen' | 'kreditfaehigkeit';
 

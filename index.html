@@ -25,27 +25,25 @@
         :root { --base-font-size: 16px; }
         body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         
-        /* PROFESSIONELLE PDF / PRINT ENGINE */
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 15mm;
+                margin: 10mm;
             }
             
             html, body {
                 background: white !important;
                 color: #0f172a !important;
                 overflow: visible !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                width: 100%;
             }
 
-            /* UI Elemente während Druck komplett entfernen */
+            /* UI-Entfernung */
             aside, header, button, nav, .print\:hidden, input, select, .custom-scrollbar {
                 display: none !important;
             }
 
-            /* Reporting Dossier anzeigen */
+            /* Dossier Container */
             .print-only {
                 display: block !important;
                 position: relative !important;
@@ -60,24 +58,73 @@
                 page-break-inside: avoid;
             }
 
-            /* Tabellen Scaling für Finanzdaten - Wichtig für 12 Monate */
+            /* FINANZ-TABELLEN ENGINE */
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                font-size: 7.5pt !important;
+                font-size: 7.2pt !important; /* Optimiert für 12-Monats-Landscape */
                 table-layout: fixed !important;
             }
             
-            .print-table th, .print-table td {
-                padding: 4px 2px !important;
-                border: 0.5pt solid #e2e8f0 !important;
-                overflow: hidden;
+            .print-table th {
+                background-color: #f8fafc !important;
+                color: #64748b !important;
+                border-bottom: 1.5pt solid #0f172a !important;
+                padding: 6px 2px !important;
+                text-align: right;
             }
 
-            /* Verstecke interaktive Chart-Elemente die nicht drucken */
-            .recharts-responsive-container {
-                width: 100% !important;
-                height: 300px !important;
+            .print-table td {
+                padding: 4px 3px !important;
+                border-bottom: 0.2pt solid #e2e8f0 !important;
+                vertical-align: middle;
+            }
+
+            /* Kontonummern-Style */
+            .print-account-num {
+                font-family: monospace !important;
+                font-size: 6pt !important;
+                color: #94a3b8 !important;
+            }
+
+            /* Highlight Rows */
+            .print-row-subtotal {
+                background-color: #f1f5f9 !important;
+                font-weight: 800 !important;
+            }
+            
+            .print-row-highlight-blue {
+                background-color: #eff6ff !important;
+                border-top: 1pt solid #3b82f6 !important;
+                border-bottom: 1pt solid #3b82f6 !important;
+                color: #1e3a8a !important;
+                font-weight: 900 !important;
+            }
+
+            .print-row-highlight-emerald {
+                background-color: #ecfdf5 !important;
+                border-top: 1pt solid #10b981 !important;
+                border-bottom: 1pt solid #10b981 !important;
+                color: #064e3b !important;
+                font-weight: 900 !important;
+            }
+
+            .print-row-final {
+                background-color: #0f172a !important;
+                color: white !important;
+                border-top: 2pt solid #f59e0b !important;
+                font-weight: 900 !important;
+            }
+            
+            .print-row-final td {
+                color: white !important;
+                padding: 10px 4px !important;
+            }
+
+            /* Branding in Print */
+            .print-brand {
+                color: #3b82f6 !important;
+                font-weight: 900 !important;
             }
         }
 

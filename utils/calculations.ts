@@ -13,7 +13,29 @@ export const calculateSectionTotal = (section: PlanSection, month?: number): num
   }, 0);
 };
 
-export const calculateKeyFigures = (sections: PlanSection[], month?: number) => {
+// Added explicit interface for return type of calculateKeyFigures to avoid type inference issues
+export interface KeyFigures {
+  revenue: number;
+  material: number;
+  db1: number;
+  personnel: number;
+  db2: number;
+  depr: number;
+  operating: number;
+  admin: number;
+  sales: number;
+  finance: number;
+  ebit: number;
+  ebitda: number;
+  egt: number;
+  privateWithdrawals: number;
+  svs: number;
+  incomeTax: number;
+  result: number;
+  totalFixedCosts: number;
+}
+
+export const calculateKeyFigures = (sections: PlanSection[], month?: number): KeyFigures => {
   const getSectionTotal = (type: SectionType) => {
     const section = sections.find(s => s.type === type);
     return section ? calculateSectionTotal(section, month) : 0;
@@ -78,9 +100,19 @@ export const distributeYearly = (total: number): { [month: number]: number } => 
   return values;
 };
 
-export const projectForecast = (sections: PlanSection[], rates: ForecastGrowthRates, years: number = 5) => {
+// Added explicit interface for return type of projectForecast
+export interface ProjectedYear {
+  yearOffset: number;
+  revenue: number;
+  db1: number;
+  ebitda: number;
+  egt: number;
+  result: number;
+}
+
+export const projectForecast = (sections: PlanSection[], rates: ForecastGrowthRates, years: number = 5): ProjectedYear[] => {
   const baseFigures = calculateKeyFigures(sections);
-  const projections = [];
+  const projections: ProjectedYear[] = [];
 
   for (let i = 0; i <= years; i++) {
     const factor = (rate: number) => Math.pow(1 + rate / 100, i);
