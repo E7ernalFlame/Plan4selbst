@@ -2,7 +2,7 @@
 import { PlanSection, LineItemType, ForecastGrowthRates, SectionType, PlanLineItem } from '../types';
 
 export const sumLineItem = (values: { [month: number]: number }): number => {
-  return Object.values(values).reduce((acc, val) => acc + val, 0);
+  return Math.round(Object.values(values).reduce((acc, val) => acc + (val || 0), 0) * 100) / 100;
 };
 
 export const calculateSectionTotal = (section: PlanSection, month?: number): number => {
@@ -13,7 +13,6 @@ export const calculateSectionTotal = (section: PlanSection, month?: number): num
   }, 0);
 };
 
-// Added explicit interface for return type of calculateKeyFigures to avoid type inference issues
 export interface KeyFigures {
   revenue: number;
   material: number;
@@ -54,16 +53,10 @@ export const calculateKeyFigures = (sections: PlanSection[], month?: number): Ke
   const sales = getSectionTotal('SALES');
   const finance = getSectionTotal('FINANCE');
 
-  // Operatives Ergebnis (EBIT)
   const ebit = db2 - (depr + operating + admin + sales);
-  
-  // EBITDA
   const ebitda = ebit + depr;
-  
-  // EGT (Ergebnis der gewöhnlichen Geschäftstätigkeit)
   const egt = ebit - finance;
 
-  // Steuern & Privat
   const taxSection = sections.find(s => s.type === 'TAX_PROVISION');
   let privateWithdrawals = 0;
   let svs = 0;
@@ -88,19 +81,47 @@ export const calculateKeyFigures = (sections: PlanSection[], month?: number): Ke
   };
 };
 
+/**
+ * Verteilt einen Jahreswert gleichmäßig auf 12 Monate.
+ */
 export const distributeYearly = (total: number): { [month: number]: number } => {
-  const monthly = Math.round((total / 12) * 100) / 100;
+  const monthly = Math.floor((total / 12) * 100) / 100;
   const values: { [month: number]: number } = {};
   let distributed = 0;
   for (let i = 1; i <= 11; i++) {
     values[i] = monthly;
     distributed += monthly;
   }
+  // Letzter Monat fängt Rundungsdifferenz auf
   values[12] = Math.round((total - distributed) * 100) / 100;
   return values;
 };
 
-// Added explicit interface for return type of projectForecast
+/**
+ * Passt Monatswerte proportional an einen neuen Jahres-Zielwert an.
+ * Erhält die bestehende Saisonalität.
+ */
+export const scaleProportionally = (newTotal: number, currentValues: { [month: number]: number }): { [month: number]: number } => {
+  const currentTotal = sumLineItem(currentValues);
+  
+  // Wenn der aktuelle Wert 0 ist, können wir nicht proportional skalieren -> klassische Verteilung
+  if (currentTotal === 0) return distributeYearly(newTotal);
+
+  const ratio = newTotal / currentTotal;
+  const newValues: { [month: number]: number } = {};
+  let distributed = 0;
+
+  for (let i = 1; i <= 11; i++) {
+    const newVal = Math.round((currentValues[i] * ratio) * 100) / 100;
+    newValues[i] = newVal;
+    distributed += newVal;
+  }
+  
+  // Letzter Monat fängt Rundungsdifferenz auf
+  newValues[12] = Math.round((newTotal - distributed) * 100) / 100;
+  return newValues;
+};
+
 export interface ProjectedYear {
   yearOffset: number;
   revenue: number;

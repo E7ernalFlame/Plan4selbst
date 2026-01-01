@@ -25,7 +25,7 @@ export const NAVIGATION_ITEMS = [
   { id: 'investition', label: 'Investitionsplanung', icon: <HardHat size={20} />, path: '/investments' },
   { id: 'kredit', label: 'Kreditrechner', icon: <CreditCard size={20} />, path: '/credit' },
   { id: 'kreditfaehigkeit', label: 'Kreditfähigkeit', icon: <ShieldCheck size={20} />, path: '/credit-capacity' },
-  { id: 'prognose', label: 'Prognose & Simulation', icon: <Zap size={20} />, path: '/simulation' },
+  { id: 'prognose', label: 'Prognose', icon: <Zap size={20} />, path: '/simulation' },
   { id: 'auswertungen', label: 'Auswertungen', icon: <PieChart size={20} />, path: '/reports' },
   { id: 'einstellungen', label: 'Einstellungen', icon: <Settings size={20} />, path: '/settings' },
 ];

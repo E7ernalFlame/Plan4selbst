@@ -28,7 +28,7 @@
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 10mm;
+                margin: 8mm;
             }
             
             html, body {
@@ -36,14 +36,13 @@
                 color: #0f172a !important;
                 overflow: visible !important;
                 width: 100%;
+                font-size: 8pt !important;
             }
 
-            /* UI-Entfernung */
-            aside, header, button, nav, .print\:hidden, input, select, .custom-scrollbar {
+            aside, header, button, nav, .print\:hidden, input, select, .custom-scrollbar, .no-print {
                 display: none !important;
             }
 
-            /* Dossier Container */
             .print-only {
                 display: block !important;
                 position: relative !important;
@@ -58,36 +57,60 @@
                 page-break-inside: avoid;
             }
 
-            /* FINANZ-TABELLEN ENGINE */
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                font-size: 7.2pt !important; /* Optimiert für 12-Monats-Landscape */
                 table-layout: fixed !important;
+                margin-top: 5mm;
             }
             
             .print-table th {
-                background-color: #f8fafc !important;
-                color: #64748b !important;
-                border-bottom: 1.5pt solid #0f172a !important;
-                padding: 6px 2px !important;
+                background-color: #f1f5f9 !important;
+                color: #475569 !important;
+                border-bottom: 1pt solid #0f172a !important;
+                padding: 4px 2px !important;
                 text-align: right;
+                font-weight: 800 !important;
+                font-size: 6.5pt !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.05em !important;
             }
 
             .print-table td {
-                padding: 4px 3px !important;
-                border-bottom: 0.2pt solid #e2e8f0 !important;
+                padding: 3px 2px !important;
+                border-bottom: 0.1pt solid #e2e8f0 !important;
                 vertical-align: middle;
+                font-size: 7pt !important;
             }
 
-            /* Kontonummern-Style */
             .print-account-num {
-                font-family: monospace !important;
-                font-size: 6pt !important;
-                color: #94a3b8 !important;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+                font-size: 5.5pt !important;
+                color: #64748b !important;
+                width: 30px;
             }
 
-            /* Highlight Rows */
+            .print-label-cell {
+                text-align: left !important;
+                font-weight: 600 !important;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .print-value-cell {
+                text-align: right !important;
+                font-family: 'Inter', sans-serif !important;
+            }
+
+            .print-row-section-header {
+                background-color: #f8fafc !important;
+                font-weight: 900 !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.1em !important;
+                border-top: 1pt solid #cbd5e1 !important;
+            }
+
             .print-row-subtotal {
                 background-color: #f1f5f9 !important;
                 font-weight: 800 !important;
@@ -95,16 +118,16 @@
             
             .print-row-highlight-blue {
                 background-color: #eff6ff !important;
-                border-top: 1pt solid #3b82f6 !important;
-                border-bottom: 1pt solid #3b82f6 !important;
+                border-top: 0.5pt solid #3b82f6 !important;
+                border-bottom: 0.5pt solid #3b82f6 !important;
                 color: #1e3a8a !important;
                 font-weight: 900 !important;
             }
 
             .print-row-highlight-emerald {
                 background-color: #ecfdf5 !important;
-                border-top: 1pt solid #10b981 !important;
-                border-bottom: 1pt solid #10b981 !important;
+                border-top: 0.5pt solid #10b981 !important;
+                border-bottom: 0.5pt solid #10b981 !important;
                 color: #064e3b !important;
                 font-weight: 900 !important;
             }
@@ -112,16 +135,16 @@
             .print-row-final {
                 background-color: #0f172a !important;
                 color: white !important;
-                border-top: 2pt solid #f59e0b !important;
+                border-top: 1.5pt solid #f59e0b !important;
                 font-weight: 900 !important;
             }
             
             .print-row-final td {
-                color: white !important;
-                padding: 10px 4px !important;
+                color: #000 !important; /* In print black on light is better, but here we keep the block style */
+                background-color: #fef3c7 !important; 
+                padding: 6px 2px !important;
             }
 
-            /* Branding in Print */
             .print-brand {
                 color: #3b82f6 !important;
                 font-weight: 900 !important;
@@ -139,7 +162,9 @@
     "react/": "https://esm.sh/react@^19.2.3/",
     "firebase/": "https://esm.sh/firebase@^12.7.0/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0"
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
   }
 }
 </script>

@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, ChevronRight, ChevronDown, FileSpreadsheet, Calculator, ArrowDown, ArrowUp, Download } from 'lucide-react';
-import { PlanSection, PlanLineItem, LineItemType } from '../types';
+import { Plus, Trash2, ChevronRight, ChevronDown, FileSpreadsheet, Calculator, ArrowDown, ArrowUp, Download, Zap } from 'lucide-react';
+import { PlanSection, PlanLineItem, LineItemType, SectionType } from '../types';
 import { formatNumber, parseLocaleNumber } from '../utils/formatting';
-import { sumLineItem, calculateSectionTotal, calculateKeyFigures, distributeYearly } from '../utils/calculations';
+import { sumLineItem, calculateSectionTotal, calculateKeyFigures, distributeYearly, scaleProportionally } from '../utils/calculations';
 import { MONTH_NAMES } from '../constants';
 import { ExportModal } from './ExportModal';
+import { ExcelImportModal } from './ExcelImportModal';
 
 interface PlanrechnungTableProps {
   sections: PlanSection[];
@@ -18,6 +19,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [editingCell, setEditingCell] = useState<{ row: string, col: number | 'year' } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   
   const toggleSection = (id: string) => {
     setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
@@ -61,6 +63,19 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
     onUpdateSections(newSections);
   };
 
+  const handleExcelImport = (mappedData: Partial<Record<SectionType, PlanLineItem[]>>) => {
+    const newSections = sections.map(section => {
+      const importedItems = mappedData[section.type];
+      if (!importedItems) return section;
+      
+      return {
+        ...section,
+        items: [...section.items, ...importedItems]
+      };
+    });
+    onUpdateSections(newSections);
+  };
+
   const keyFigures = useMemo(() => calculateKeyFigures(sections), [sections]);
 
   const renderCell = (sectionId: string, item: PlanLineItem, col: number | 'year') => {
@@ -76,11 +91,21 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
             defaultValue={value === 0 ? '' : formatNumber(value)}
             onBlur={(e) => {
               const num = parseLocaleNumber(e.target.value);
-              if (col === 'year') updateLineItem(sectionId, item.id, { values: distributeYearly(num) });
-              else updateLineItem(sectionId, item.id, { values: { ...item.values, [col]: num } });
+              
+              if (col === 'year') {
+                // Top-Down: Proportional skalieren basierend auf bisherigem Verlauf
+                const newValues = scaleProportionally(num, item.values);
+                updateLineItem(sectionId, item.id, { values: newValues });
+              } else {
+                // Bottom-Up: Nur diesen Monat ändern, Summe ergibt sich automatisch
+                updateLineItem(sectionId, item.id, { values: { ...item.values, [col]: num } });
+              }
               setEditingCell(null);
             }}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') setEditingCell(null);
+            }}
           />
         </div>
       );
@@ -89,11 +114,11 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
     return (
       <div 
         onClick={() => setEditingCell({ row: item.id, col })}
-        className={`w-full h-full flex items-center justify-end px-3 cursor-text text-sm font-semibold transition-colors ${
+        className={`w-full h-full flex items-center justify-end px-3 cursor-text text-sm font-semibold transition-all ${
           col === 'year' 
-            ? 'text-slate-900 dark:text-white font-bold' 
+            ? 'text-slate-900 dark:text-white font-black bg-blue-50/10 dark:bg-blue-900/5' 
             : 'text-slate-500 dark:text-slate-400'
-        } hover:bg-blue-50/50 dark:hover:bg-blue-900/10`}
+        } hover:bg-blue-50/50 dark:hover:bg-blue-900/20`}
       >
         {formatNumber(value)}
       </div>
@@ -106,16 +131,26 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
         <div className="flex items-center gap-4">
            <div className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <Calculator size={14} className="text-blue-600" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Kalkulation Aktiv</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Planungsmodus Aktiv</span>
            </div>
-           <p className="text-[11px] text-slate-400 font-medium italic">Editieren Sie den Jahreswert für automatische Gleichverteilung.</p>
+           <p className="text-[11px] text-slate-400 font-medium italic">
+             <span className="text-blue-600 font-bold">Tipp:</span> Monate ändern aktualisiert das Jahr. Jahr ändern skaliert Monate proportional.
+           </p>
         </div>
-        <button 
-          onClick={() => setShowExportModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:border-blue-400 transition-all shadow-sm"
-        >
-          <Download size={14} className="text-blue-600" /> Export Options
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-sm group"
+          >
+            <Zap size={14} className="group-hover:fill-current" /> Smart Excel Import
+          </button>
+          <button 
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:border-blue-400 transition-all shadow-sm"
+          >
+            <Download size={14} className="text-blue-600" /> Export Options
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto custom-scrollbar">
@@ -124,7 +159,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
             <tr className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
               <th className="w-[48px] sticky left-0 z-[60] bg-white dark:bg-slate-950"></th>
               <th className="w-[340px] text-left px-6 py-4 font-black text-slate-400 uppercase tracking-[0.2em] text-[9px] sticky left-[48px] z-[60] bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">Bezeichnung / Konto</th>
-              <th className="w-[150px] text-right px-6 py-4 font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] text-[9px] bg-blue-50/20 dark:bg-blue-900/10 border-r border-slate-100 dark:border-slate-800">Jahreswert</th>
+              <th className="w-[150px] text-right px-6 py-4 font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] text-[9px] bg-blue-50/20 dark:bg-blue-900/10 border-r border-slate-100 dark:border-slate-800">Jahreswert Σ</th>
               {MONTH_NAMES.map((name, i) => (
                 <th key={i} className={`w-[110px] text-right px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-[9px] border-r border-slate-100/30 dark:border-slate-800/30 ${i % 3 === 2 ? 'border-r-slate-300 dark:border-r-slate-600' : ''}`}>
                   {name}
@@ -136,7 +171,6 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
           <tbody className="divide-y divide-slate-100 dark:divide-slate-900">
             {sections.map((section) => (
               <React.Fragment key={section.id}>
-                {/* --- Section Header --- */}
                 <tr className="bg-slate-50/60 dark:bg-slate-900/40 group/section border-t-2 border-slate-100 dark:border-slate-800">
                   <td className="sticky left-0 z-50 bg-slate-50 dark:bg-slate-900/40 border-r border-transparent flex items-center justify-center h-12">
                     <button onClick={() => addLineItem(section.id)} className="w-7 h-7 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg opacity-0 group-hover/section:opacity-100 transition-all hover:bg-blue-600 hover:text-white shadow-sm"><Plus size={16} /></button>
@@ -192,7 +226,6 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                   </tr>
                 ))}
                 
-                {/* --- Subtotals --- */}
                 {section.type === 'MATERIAL' && (
                   <tr className="bg-emerald-600 text-white font-black h-12 shadow-lg relative z-30">
                     <td className="sticky left-0 z-50 bg-emerald-600 border-r border-transparent"></td>
@@ -243,14 +276,13 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                     <td className="sticky left-0 z-50 bg-slate-900 border-r border-transparent h-12"></td>
                     <td className="px-6 sticky left-[48px] z-50 bg-slate-900 border-r border-slate-800 text-[9px] font-black uppercase tracking-[0.2em] h-12">Ergebnis d. gew. Geschäftstätigkeit (EGT)</td>
                     <td className="px-6 text-right border-r border-slate-800 text-white text-lg">{formatNumber(keyFigures.egt)}</td>
-                    {Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-black opacity-80 ${i % 3 === 2 ? 'border-r border-slate-800' : ''}`}>{formatNumber(calculateKeyFigures(sections, i + 1).egt)}</td>)}
+                    {Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-black opacity-80 ${i % 3 === 2 ? 'border-r-slate-800' : ''}`}>{formatNumber(calculateKeyFigures(sections, i + 1).egt)}</td>)}
                     <td></td>
                   </tr>
                 )}
               </React.Fragment>
             ))}
 
-            {/* --- GRAND TOTAL --- */}
             <tr className="bg-slate-950 text-white h-20 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] border-t-4 border-amber-500/50 relative z-40">
               <td className="sticky left-0 z-50 bg-slate-950 border-r border-transparent h-20"></td>
               <td className="px-6 sticky left-[48px] z-50 bg-slate-950 border-r border-slate-900 text-[11px] font-black uppercase tracking-[0.4em] text-amber-500 h-20">
@@ -276,6 +308,13 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
         onClose={() => setShowExportModal(false)} 
         clientName={clientName}
         initialModuleId="planrechnung"
+        onExport={() => {}} 
+      />
+
+      <ExcelImportModal 
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleExcelImport}
       />
     </div>
   );
