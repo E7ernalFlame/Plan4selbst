@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { 
   X, 
@@ -20,7 +19,9 @@ import {
   Table as TableIcon
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { GoogleGenAI, Type } from '@google/genai';
+// Always use the recommended named import for GoogleGenAI and Type
+import { GoogleGenAI } from "@google/genai";
+import { Type } from "@google/genai";
 import { SectionType, PlanLineItem, LineItemType } from '../types';
 import { distributeYearly } from '../utils/calculations';
 
@@ -124,7 +125,8 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Create a new GoogleGenAI instance right before making an API call following strict guidelines
+      const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
       let contents: any;
 
       if (file.type === 'application/pdf') {
@@ -142,6 +144,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
         contents = `Analysiere Excel-Datenzeilen und mappe sie auf österreichisches UGB-Schema. Daten: ${sampleData}`;
       }
 
+      // Generate content using Gemini 3 Pro for complex extraction
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: contents,
@@ -159,16 +162,19 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
                 confidence: { type: Type.NUMBER },
                 reason: { type: Type.STRING }
               },
-              required: ["originalLabel", "detectedValue", "targetSection", "confidence"]
+              required: ["originalLabel", "detectedValue", "targetSection", "confidence"],
+              propertyOrdering: ["originalLabel", "accountNumber", "detectedValue", "targetSection", "confidence", "reason"]
             }
           }
         }
       });
 
+      // Extract text output correctly from the GenerateContentResponse object
       const results = JSON.parse(response.text || '[]') as MappedRow[];
       setMappedRows(results.filter(r => r.detectedValue !== 0 && r.originalLabel));
       setStep('mapping');
     } catch (err: any) {
+      console.error('AI Error:', err);
       setError(err.message || "KI-Fehler.");
       setStep('upload');
     }

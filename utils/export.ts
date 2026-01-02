@@ -1,5 +1,6 @@
 
-import { Client, Analysis } from '../types';
+import * as XLSX from 'xlsx';
+import { Client, Analysis, PlanSection } from '../types';
 import { sumLineItem } from './calculations';
 import { MONTH_NAMES } from '../constants';
 
@@ -9,42 +10,58 @@ export const generateExcelReport = (data: {
   selectedModules: string[];
 }) => {
   const { client, analysis, selectedModules } = data;
-  let csvContent = "\ufeff"; 
+  
+  if (!selectedModules.includes('planrechnung')) return;
 
-  if (selectedModules.includes('planrechnung')) {
-    csvContent += `BERICHT: PLANRECHNUNG GUV;;\n`;
-    csvContent += `Mandant:;${client.name};;\n`;
-    csvContent += `Analyse:;${analysis.name};;\n\n`;
-    csvContent += `Konto;Bezeichnung;Jahreswert;${MONTH_NAMES.join(';')}\n`;
-    
-    analysis.planData.forEach(section => {
-      csvContent += `;${section.label.toUpperCase()};;${MONTH_NAMES.map(() => '').join(';')}\n`;
-      section.items.forEach(item => {
-        const row = [
-          item.accountNumber || '',
-          item.label,
-          sumLineItem(item.values).toFixed(2).replace('.', ','),
-          ...MONTH_NAMES.map((_, i) => (item.values[i + 1] || 0).toFixed(2).replace('.', ','))
-        ];
-        csvContent += row.join(';') + '\n';
-      });
-      csvContent += '\n';
+  const wb = XLSX.utils.book_new();
+  const wsData: any[][] = [
+    [`BERICHT: PLANRECHNUNG GUV - ${client.name}`],
+    [`Analyse: ${analysis.name}`],
+    [`Erstellt am: ${new Date().toLocaleDateString('de-AT')}`],
+    [],
+    ['Konto', 'Bezeichnung', 'Jahreswert Σ', ...MONTH_NAMES]
+  ];
+
+  analysis.planData.forEach(section => {
+    // Sektions-Header
+    wsData.push([
+      '', 
+      section.label.toUpperCase(), 
+      '', 
+      ...MONTH_NAMES.map(() => '')
+    ]);
+
+    section.items.forEach(item => {
+      const row = [
+        item.accountNumber || '',
+        item.label,
+        sumLineItem(item.values),
+        ...MONTH_NAMES.map((_, i) => item.values[i + 1] || 0)
+      ];
+      wsData.push(row);
     });
-  }
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `Export_${client.name.replace(/\s+/g, '_')}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    // Leerzeile nach Sektion
+    wsData.push([]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Spaltenbreiten definieren
+  ws['!cols'] = [
+    { wch: 8 },  // Konto
+    { wch: 35 }, // Bezeichnung
+    { wch: 15 }, // Summe
+    ...MONTH_NAMES.map(() => ({ wch: 12 })) // Monate
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Planrechnung");
+  
+  // Datei schreiben und herunterladen
+  XLSX.writeFile(wb, `Planrechnung_${client.name.replace(/\s+/g, '_')}_${analysis.name.replace(/\s+/g, '_')}.xlsx`);
 };
 
 export const triggerPdfExport = () => {
-  // Kleiner Delay hilft dem Browser, das Hidden-Div für den Druck vorzubereiten
-  setTimeout(() => {
-    window.print();
-  }, 300);
+  // Wir nutzen window.print(), da das CSS in index.html optimiert wurde
+  window.print();
 };

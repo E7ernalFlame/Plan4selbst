@@ -35,18 +35,30 @@
                 background: white !important;
                 color: #0f172a !important;
                 overflow: visible !important;
-                width: 100%;
-                font-size: 8pt !important;
+                height: auto !important;
+                width: 100% !important;
+                font-size: 7.5pt !important;
+                line-height: 1.2;
             }
 
-            aside, header, button, nav, .print\:hidden, input, select, .custom-scrollbar, .no-print {
+            /* Verstecke UI Elemente */
+            aside, header, button, nav, .print\:hidden, .no-print, input::placeholder, .shadow-xl, .shadow-sm {
                 display: none !important;
+            }
+
+            /* Container-Reset */
+            #root, main, .flex-1 {
+                display: block !important;
+                overflow: visible !important;
+                height: auto !important;
+                width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
 
             .print-only {
                 display: block !important;
-                position: relative !important;
-                width: 100% !important;
+                visibility: visible !important;
             }
 
             .page-break {
@@ -57,98 +69,81 @@
                 page-break-inside: avoid;
             }
 
+            /* Tabellen-Styling für maximale Präzision */
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
                 table-layout: fixed !important;
-                margin-top: 5mm;
+                margin-top: 2mm;
             }
             
             .print-table th {
-                background-color: #f1f5f9 !important;
+                background-color: #f8fafc !important;
                 color: #475569 !important;
-                border-bottom: 1pt solid #0f172a !important;
-                padding: 4px 2px !important;
+                border-bottom: 2pt solid #0f172a !important;
+                padding: 5px 2px !important;
                 text-align: right;
                 font-weight: 800 !important;
-                font-size: 6.5pt !important;
                 text-transform: uppercase !important;
-                letter-spacing: 0.05em !important;
+                font-size: 6.5pt !important;
             }
 
             .print-table td {
-                padding: 3px 2px !important;
-                border-bottom: 0.1pt solid #e2e8f0 !important;
+                padding: 3.5px 2px !important;
+                border-bottom: 0.5pt solid #e2e8f0 !important;
                 vertical-align: middle;
-                font-size: 7pt !important;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
             }
 
+            /* Spalten-Breiten-Management */
             .print-account-num {
-                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-                font-size: 5.5pt !important;
+                width: 30px !important;
+                font-family: ui-monospace, monospace !important;
+                font-size: 6pt !important;
                 color: #64748b !important;
-                width: 30px;
+                text-align: center !important;
             }
 
             .print-label-cell {
+                width: 180px !important;
                 text-align: left !important;
                 font-weight: 600 !important;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
             }
 
             .print-value-cell {
+                width: 65px !important;
                 text-align: right !important;
-                font-family: 'Inter', sans-serif !important;
+                font-family: ui-monospace, monospace !important;
+                font-size: 7pt !important;
             }
 
             .print-row-section-header {
-                background-color: #f8fafc !important;
-                font-weight: 900 !important;
-                text-transform: uppercase !important;
-                letter-spacing: 0.1em !important;
-                border-top: 1pt solid #cbd5e1 !important;
-            }
-
-            .print-row-subtotal {
                 background-color: #f1f5f9 !important;
-                font-weight: 800 !important;
-            }
-            
-            .print-row-highlight-blue {
-                background-color: #eff6ff !important;
-                border-top: 0.5pt solid #3b82f6 !important;
-                border-bottom: 0.5pt solid #3b82f6 !important;
-                color: #1e3a8a !important;
                 font-weight: 900 !important;
-            }
-
-            .print-row-highlight-emerald {
-                background-color: #ecfdf5 !important;
-                border-top: 0.5pt solid #10b981 !important;
-                border-bottom: 0.5pt solid #10b981 !important;
-                color: #064e3b !important;
-                font-weight: 900 !important;
+                border-top: 1.5pt solid #64748b !important;
             }
 
             .print-row-final {
-                background-color: #0f172a !important;
-                color: white !important;
-                border-top: 1.5pt solid #f59e0b !important;
+                background-color: #fffbeb !important;
+                color: #000 !important;
+                border-top: 2.5pt solid #d97706 !important;
+                border-bottom: 2.5pt solid #d97706 !important;
                 font-weight: 900 !important;
             }
             
-            .print-row-final td {
-                color: #000 !important; /* In print black on light is better, but here we keep the block style */
-                background-color: #fef3c7 !important; 
-                padding: 6px 2px !important;
-            }
-
-            .print-brand {
-                color: #3b82f6 !important;
-                font-weight: 900 !important;
-            }
+            /* Sektions-Highlights */
+            .bg-emerald-50 { background-color: #ecfdf5 !important; }
+            .bg-blue-50 { background-color: #eff6ff !important; }
+            .bg-blue-100 { background-color: #dbeafe !important; }
+            .bg-slate-100 { background-color: #f1f5f9 !important; }
+            .bg-slate-800 { background-color: #1e293b !important; color: white !important; }
+            .bg-amber-50 { background-color: #fffbeb !important; }
+            
+            .text-blue-600 { color: #2563eb !important; }
+            .text-emerald-900 { color: #064e3b !important; }
+            .text-white { color: white !important; }
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }

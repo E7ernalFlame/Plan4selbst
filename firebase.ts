@@ -1,6 +1,6 @@
-// Ensure modular imports from 'firebase/app' and 'firebase/auth' are used correctly
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// Standard Firebase v9+ modular initialization
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBRWZoTXE2WtUErAM1Zn44_tCgz42bHRBI",

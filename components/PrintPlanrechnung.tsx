@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PlanSection, SectionType } from '../types';
+import { PlanSection, LineItemType } from '../types';
 import { formatNumber } from '../utils/formatting';
 import { sumLineItem, calculateSectionTotal, calculateKeyFigures } from '../utils/calculations';
 import { MONTH_NAMES } from '../constants';
@@ -14,32 +14,40 @@ interface PrintPlanrechnungProps {
 export const PrintPlanrechnung: React.FC<PrintPlanrechnungProps> = ({ sections, clientName, analysisName }) => {
   const keyFigures = calculateKeyFigures(sections);
 
-  const getMonthTotalForSection = (section: PlanSection, month: number) => {
-    return calculateSectionTotal(section, month);
-  };
-
-  const getMonthKeyFigure = (month: number) => {
-    return calculateKeyFigures(sections, month);
-  };
+  // Hilfsfunktion für Zwischensummen-Zeilen
+  const renderSubtotalRow = (label: string, value: number, monthlyValues: number[], colorClass: string = "bg-slate-100") => (
+    <tr className={`${colorClass} font-black border-y-2 border-slate-300 no-break`}>
+      <td className="print-account-num"></td>
+      <td className="print-label-cell uppercase tracking-wider">{label}</td>
+      <td className="print-value-cell">{formatNumber(value)}</td>
+      {monthlyValues.map((v, i) => (
+        <td key={i} className="print-value-cell">{formatNumber(v)}</td>
+      ))}
+    </tr>
+  );
 
   return (
-    <div className="print-only hidden">
-      <div className="mb-6 flex justify-between items-end border-b border-slate-300 pb-4">
+    <div className="print-only hidden w-full bg-white text-slate-950 p-0">
+      {/* Header Bereich für jede Seite (via CSS gesteuert) */}
+      <div className="mb-6 flex justify-between items-end border-b-4 border-blue-600 pb-4">
         <div>
-          <h2 className="text-xl font-black tracking-tighter uppercase">Planerfolgsrechnung (GuV) 2024</h2>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{clientName} | {analysisName}</p>
+          <h1 className="text-2xl font-black tracking-tighter uppercase leading-none text-blue-600">Planerfolgsrechnung (GuV)</h1>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-1">
+            {clientName} <span className="mx-2 text-slate-300">|</span> {analysisName} <span className="mx-2 text-slate-300">|</span> Planjahr 2024
+          </p>
         </div>
-        <div className="text-right text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-          Währung: EUR | Alle Werte exkl. USt.
+        <div className="text-right">
+          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Bericht erstellt am</p>
+          <p className="text-[10px] font-bold">{new Date().toLocaleDateString('de-AT')} - {new Date().toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}</p>
         </div>
       </div>
 
-      <table className="print-table">
+      <table className="print-table w-full">
         <thead>
           <tr>
             <th className="print-account-num">Kto.</th>
-            <th className="print-label-cell w-[180px]">Bezeichnung</th>
-            <th className="print-value-cell bg-slate-100/50">Gesamt/J</th>
+            <th className="print-label-cell">Posten / Bezeichnung</th>
+            <th className="print-value-cell bg-slate-50 border-x border-slate-200">Gesamt Σ</th>
             {MONTH_NAMES.map((m, i) => (
               <th key={i} className="print-value-cell">{m.substring(0, 3)}</th>
             ))}
@@ -49,89 +57,85 @@ export const PrintPlanrechnung: React.FC<PrintPlanrechnungProps> = ({ sections, 
           {sections.map((section) => (
             <React.Fragment key={section.id}>
               {/* Sektions-Header */}
-              <tr className="print-row-section-header">
+              <tr className="print-row-section-header no-break">
                 <td className="print-account-num"></td>
-                <td className="print-label-cell">{section.label}</td>
-                <td className="print-value-cell">{formatNumber(calculateSectionTotal(section))}</td>
+                <td className="print-label-cell font-black bg-slate-50">{section.label.toUpperCase()}</td>
+                <td className="print-value-cell bg-slate-50 border-x border-slate-200">{formatNumber(calculateSectionTotal(section))}</td>
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <td key={i} className="print-value-cell">{formatNumber(calculateSectionTotal(section, i + 1))}</td>
+                  <td key={i} className="print-value-cell bg-slate-50/50">{formatNumber(calculateSectionTotal(section, i + 1))}</td>
                 ))}
               </tr>
 
-              {/* Einzelposten */}
+              {/* Einzelposten der Sektion */}
               {section.items.map((item) => (
-                <tr key={item.id}>
-                  <td className="print-account-num">{item.accountNumber}</td>
-                  <td className="print-label-cell pl-4">{item.label}</td>
-                  <td className="print-value-cell font-bold">{formatNumber(sumLineItem(item.values))}</td>
+                <tr key={item.id} className="no-break border-b border-slate-100">
+                  <td className="print-account-num text-slate-400">{item.accountNumber || '---'}</td>
+                  <td className="print-label-cell italic pl-6 text-slate-700">{item.label}</td>
+                  <td className="print-value-cell font-bold border-x border-slate-100">{formatNumber(sumLineItem(item.values))}</td>
                   {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="print-value-cell">{formatNumber(item.values[i + 1] || 0)}</td>
+                    <td key={i} className="print-value-cell text-slate-500">{formatNumber(item.values[i + 1] || 0)}</td>
                   ))}
                 </tr>
               ))}
 
-              {/* Zwischensummen & Kennzahlen-Integration */}
-              {section.type === 'MATERIAL' && (
-                <tr className="print-row-highlight-emerald">
-                  <td className="print-account-num"></td>
-                  <td className="print-label-cell">DECKUNGSBEITRAG 1 (MARGE)</td>
-                  <td className="print-value-cell">{formatNumber(keyFigures.db1)}</td>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="print-value-cell">{formatNumber(getMonthKeyFigure(i + 1).db1)}</td>
-                  ))}
-                </tr>
+              {/* Logische Zwischensummen einfügen basierend auf Sektionstyp */}
+              {section.type === 'MATERIAL' && renderSubtotalRow(
+                "Deckungsbeitrag 1 (Rohertrag)", 
+                keyFigures.db1, 
+                Array.from({ length: 12 }).map((_, i) => calculateKeyFigures(sections, i + 1).db1),
+                "bg-emerald-50 text-emerald-900 border-emerald-200"
               )}
 
-              {section.type === 'PERSONNEL' && (
-                <tr className="print-row-subtotal">
-                  <td className="print-account-num"></td>
-                  <td className="print-label-cell">DECKUNGSBEITRAG 2</td>
-                  <td className="print-value-cell">{formatNumber(keyFigures.db2)}</td>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="print-value-cell">{formatNumber(getMonthKeyFigure(i + 1).db2)}</td>
-                  ))}
-                </tr>
+              {section.type === 'PERSONNEL' && renderSubtotalRow(
+                "Deckungsbeitrag 2 (nach Personal)", 
+                keyFigures.db2, 
+                Array.from({ length: 12 }).map((_, i) => calculateKeyFigures(sections, i + 1).db2),
+                "bg-slate-100 text-slate-900"
               )}
 
-              {section.type === 'ADMIN' && (
-                <tr className="print-row-highlight-blue">
-                  <td className="print-account-num"></td>
-                  <td className="print-label-cell">OPERATIVES ERGEBNIS (EBIT)</td>
-                  <td className="print-value-cell">{formatNumber(keyFigures.ebit)}</td>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="print-value-cell">{formatNumber(getMonthKeyFigure(i + 1).ebit)}</td>
-                  ))}
-                </tr>
+              {section.type === 'DEPRECIATION' && renderSubtotalRow(
+                "Operatives EBITDA", 
+                keyFigures.ebitda, 
+                Array.from({ length: 12 }).map((_, i) => calculateKeyFigures(sections, i + 1).ebitda),
+                "bg-blue-50/50 text-blue-900"
               )}
 
-              {section.type === 'FINANCE' && (
-                <tr className="print-row-subtotal">
-                  <td className="print-account-num"></td>
-                  <td className="print-label-cell">ERGEBNIS D. GEW. GESCHÄFTSTÄTIGKEIT (EGT)</td>
-                  <td className="print-value-cell">{formatNumber(keyFigures.egt)}</td>
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <td key={i} className="print-value-cell">{formatNumber(getMonthKeyFigure(i + 1).egt)}</td>
-                  ))}
-                </tr>
+              {section.type === 'ADMIN' && renderSubtotalRow(
+                "Operatives Ergebnis (EBIT)", 
+                keyFigures.ebit, 
+                Array.from({ length: 12 }).map((_, i) => calculateKeyFigures(sections, i + 1).ebit),
+                "bg-blue-100 text-blue-900 border-blue-200"
+              )}
+
+              {section.type === 'FINANCE' && renderSubtotalRow(
+                "Ergebnis der gewöhnlichen Gt. (EGT)", 
+                keyFigures.egt, 
+                Array.from({ length: 12 }).map((_, i) => calculateKeyFigures(sections, i + 1).egt),
+                "bg-slate-800 text-white border-slate-900"
               )}
             </React.Fragment>
           ))}
 
           {/* Endergebnis */}
-          <tr className="print-row-final">
+          <tr className="print-row-final no-break">
             <td className="print-account-num"></td>
-            <td className="print-label-cell">NETTO-VERBLEIB (NACH STEUERN & PRIVAT)</td>
-            <td className="print-value-cell">{formatNumber(keyFigures.result)}</td>
+            <td className="print-label-cell text-lg">NETTO-VERBLEIB (PROJ. ÜBERSCHUSS)</td>
+            <td className="print-value-cell text-xl border-x border-amber-400 bg-amber-50">{formatNumber(keyFigures.result)}</td>
             {Array.from({ length: 12 }).map((_, i) => (
-              <td key={i} className="print-value-cell">{formatNumber(getMonthKeyFigure(i + 1).result)}</td>
+              <td key={i} className="print-value-cell font-black">{formatNumber(calculateKeyFigures(sections, i + 1).result)}</td>
             ))}
           </tr>
         </tbody>
       </table>
 
-      <div className="mt-12 pt-4 border-t border-slate-200 text-[6pt] flex justify-between text-slate-400 font-bold uppercase tracking-widest">
-        <span>Erstellt mit plan4selbst.at | Business Intelligence for SMEs</span>
-        <span>Seite 2 / 2</span>
+      {/* Fußzeile */}
+      <div className="mt-12 pt-4 border-t border-slate-200 text-[7pt] flex justify-between text-slate-400 font-bold uppercase tracking-[0.2em]">
+        <div className="flex gap-4">
+          <span>plan4selbst.at Professional BI</span>
+          <span className="text-slate-200">|</span>
+          <span>System-ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
+        </div>
+        <span>Vertraulicher Managementbericht - Seite 1 / 1</span>
       </div>
     </div>
   );
