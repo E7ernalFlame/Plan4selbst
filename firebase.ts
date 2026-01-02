@@ -1,4 +1,4 @@
-
+// Ensure modular imports from 'firebase/app' and 'firebase/auth' are used correctly
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
@@ -11,5 +11,6 @@ const firebaseConfig = {
   appId: "1:111681838120:web:6dbc77d7aeadd457cce91d"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

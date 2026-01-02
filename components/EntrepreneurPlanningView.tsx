@@ -13,7 +13,8 @@ import {
   Briefcase, 
   Heart, 
   Target,
-  ArrowRightCircle
+  ArrowRightCircle,
+  Link2
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '../utils/formatting';
 
@@ -94,9 +95,9 @@ export const EntrepreneurPlanningView: React.FC = () => {
              </div>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-500/20 transition-all active:scale-95">
-          <Save size={16} /> Übernahme ins Budget
-        </button>
+        <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-widest">
+           <Link2 size={14} /> Master-Sync Aktiv
+        </div>
       </div>
 
       {/* KPI Cards */}

@@ -322,7 +322,8 @@ const App: React.FC = () => {
         {activeTab === 'ressourcen' && <ResourcePlanningView />}
         {activeTab === 'personal' && <PersonnelPlanningView />}
         {activeTab === 'investition' && <InvestmentPlanningView />}
-        {activeTab === 'kredit' && <CreditCalculatorView />}
+        {/* Pass activeAnalysis.planData to CreditCalculatorView's required 'sections' prop */}
+        {activeTab === 'kredit' && <CreditCalculatorView sections={activeAnalysis.planData} />}
         {activeTab === 'entrepreneur' && <EntrepreneurPlanningView />}
         {activeTab === 'tax-calculator' && <TaxCalculatorView />}
         {activeTab === 'prognose' && <ForecastView sections={activeAnalysis.planData} allScenarios={allScenariosForForecast} baseYear={2024} rates={forecastRates} onUpdateRates={setForecastRates} />}

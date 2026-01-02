@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { PlanSection, ForecastGrowthRates } from '../types';
 import { projectForecast } from '../utils/calculations';
@@ -85,7 +84,8 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ sections, rates, onU
         'Basis': base,
         'Optimistisch': opt,
         'Worst Case': worst,
-        // Range für das Shading
+        // Range für das Shading - Recharts Area supports [min, max] arrays in data for range areas
+        range: [worst, opt],
         rangeMin: worst,
         rangeMax: opt
       };
@@ -231,10 +231,10 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ sections, rates, onU
                     <Tooltip content={<CustomForecastTooltip />} />
                     <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: '900', paddingBottom: '30px', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
                     
+                    {/* Fixed Recharts Area by using a range [min, max] via the 'range' dataKey */}
                     <Area 
                       type="monotone" 
-                      dataKey="rangeMax" 
-                      baseArea={scenarioData.map(d => d.rangeMin)}
+                      dataKey="range" 
                       fill="#3b82f6" 
                       fillOpacity={0.1} 
                       stroke="none" 
