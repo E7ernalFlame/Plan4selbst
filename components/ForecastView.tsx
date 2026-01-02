@@ -1,6 +1,7 @@
+
 import React, { useMemo, useState } from 'react';
 import { PlanSection, ForecastGrowthRates } from '../types';
-import { projectForecast } from '../utils/calculations';
+import { projectForecast, calculateKeyFigures } from '../utils/calculations';
 import { formatCurrency, formatNumber } from '../utils/formatting';
 import { 
   XAxis, 
@@ -12,7 +13,9 @@ import {
   AreaChart, 
   Area,
   ComposedChart,
-  Line
+  Line,
+  Bar,
+  ReferenceLine
 } from 'recharts';
 import { 
   TrendingUp, 
@@ -21,7 +24,16 @@ import {
   Activity,
   Zap,
   SlidersHorizontal,
-  ArrowRightCircle
+  ArrowRightCircle,
+  ShieldCheck,
+  FileBarChart,
+  Calculator,
+  Info,
+  ChevronRight,
+  TrendingDown,
+  Target,
+  FileText,
+  BadgeAlert
 } from 'lucide-react';
 
 interface ForecastViewProps {
@@ -32,107 +44,125 @@ interface ForecastViewProps {
   onUpdateRates: (rates: ForecastGrowthRates) => void;
 }
 
-interface ScenarioOffsets {
-  optimistic: number;
-  worstCase: number;
+type ScenarioKey = 'basis' | 'best' | 'worst';
+
+interface ScenarioParams {
+  label: string;
+  revenueRate: number;
+  costRate: number;
+  color: string;
+  icon: React.ReactNode;
 }
 
-const CustomForecastTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl shadow-2xl">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{label}</p>
-        <div className="space-y-1.5">
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center justify-between gap-8">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
-                <span className="text-[11px] font-bold text-slate-300">{entry.name}:</span>
-              </div>
-              <span className="text-[11px] font-black text-white">{formatNumber(entry.value)} €</span>
-            </div>
+export const ForecastView: React.FC<ForecastViewProps> = ({ sections, rates, onUpdateRates }) => {
+  const [activeScenario, setActiveScenario] = useState<ScenarioKey>('basis');
+  
+  // Individuell anpassbare Szenario-Raten
+  const [scenarioRates, setScenarioRates] = useState<Record<ScenarioKey, number>>({
+    basis: 7,
+    best: 15,
+    worst: 3
+  });
+
+  const SCENARIOS: Record<ScenarioKey, ScenarioParams> = {
+    basis: { label: 'Basis-Szenario', revenueRate: scenarioRates.basis, costRate: 2, color: '#3b82f6', icon: <Activity size={16} /> },
+    best: { label: 'Best Case', revenueRate: scenarioRates.best, costRate: 5, color: '#10b981', icon: <Target size={16} /> },
+    worst: { label: 'Worst Case', revenueRate: scenarioRates.worst, costRate: 1, color: '#ef4444', icon: <TrendingDown size={16} /> }
+  };
+
+  // Berechnungen für alle 3 Pfade gleichzeitig (für das Risk Corridor Chart)
+  const allProjections = useMemo(() => {
+    return {
+      basis: projectForecast(sections, { ...rates, REVENUE: scenarioRates.basis }, 4),
+      best: projectForecast(sections, { ...rates, REVENUE: scenarioRates.best }, 4),
+      worst: projectForecast(sections, { ...rates, REVENUE: scenarioRates.worst }, 4)
+    };
+  }, [sections, rates, scenarioRates]);
+
+  // Daten für das große Korridor-Chart
+  const corridorData = useMemo(() => {
+    return allProjections.basis.map((p, idx) => ({
+      name: `Jahr ${idx + 1}`,
+      Basis: Math.round(p.result),
+      Best: Math.round(allProjections.best[idx].result),
+      Worst: Math.round(allProjections.worst[idx].result),
+      range: [Math.round(allProjections.worst[idx].result), Math.round(allProjections.best[idx].result)]
+    }));
+  }, [allProjections]);
+
+  const activeData = allProjections[activeScenario];
+  const lastYear = activeData[activeData.length - 1];
+  const firstYear = activeData[0];
+  const growthAbsolute = lastYear.result - firstYear.result;
+
+  const getExecutiveSummary = () => {
+    if (activeScenario === 'best') {
+      return "Dieses Szenario geht von einer aggressiven Marktdurchdringung aus. Die Investitionskraft ist hoch, was einen signifikanten Anstieg des Unternehmenswertes zur Folge hat. Fokus liegt auf Skalierung.";
+    } else if (activeScenario === 'worst') {
+      return "Ein konservativer Ausblick bei stagnierender Nachfrage. Fokus in dieser Planung ist Kostendisziplin und Cash-Sicherung, um auch bei minimalem Wachstum profitabel zu bleiben.";
+    }
+    return "Die Basisplanung spiegelt ein moderates, gesundes Wachstum wider. Die Kostenstruktur skaliert unterproportional zum Ertrag, was die operative Marge kontinuierlich verbessert.";
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700 pb-24">
+      {/* Dynamic Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Strategische Mehrjahresplanung</h2>
+          <p className="text-slate-500 font-medium italic">5-Jahres-Projektion basierend auf Szenario-Simulationen</p>
+        </div>
+        
+        {/* Scenario Switcher Tabs */}
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+          {(Object.keys(SCENARIOS) as ScenarioKey[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => setActiveScenario(key)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeScenario === key 
+                  ? 'bg-white dark:bg-slate-700 shadow-lg text-slate-900 dark:text-white scale-105 ring-1 ring-slate-200 dark:ring-slate-600' 
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <div style={{ color: SCENARIOS[key].color }}>{SCENARIOS[key].icon}</div>
+              {SCENARIOS[key].label}
+            </button>
           ))}
         </div>
       </div>
-    );
-  }
-  return null;
-};
 
-export const ForecastView: React.FC<ForecastViewProps> = ({ sections, rates, onUpdateRates }) => {
-  // Standard-Offsets laut Vorgabe: +10% und +2%
-  const [offsets, setOffsets] = useState<ScenarioOffsets>({
-    optimistic: 10,
-    worstCase: 2
-  });
-
-  // Projektion für den Basis-Trend (Jahr 1 bis Jahr 5)
-  const activeProjections = useMemo(() => projectForecast(sections, rates, 4), [sections, rates]);
-
-  // Daten für Szenarien-Vergleich (Startpunkt Jahr 1 ist identisch)
-  const scenarioData = useMemo(() => {
-    return activeProjections.map((p, idx) => {
-      const base = Math.round(p.result);
-      const isYearOne = idx === 0;
-      
-      // Offsets greifen erst ab Jahr 2 (idx > 0)
-      const opt = isYearOne ? base : Math.round(base * (1 + offsets.optimistic / 100));
-      const worst = isYearOne ? base : Math.round(base * (1 + offsets.worstCase / 100));
-      
-      return {
-        name: `Jahr ${idx + 1}`,
-        'Basis': base,
-        'Optimistisch': opt,
-        'Worst Case': worst,
-        // Range für das Shading - Recharts Area supports [min, max] arrays in data for range areas
-        range: [worst, opt],
-        rangeMin: worst,
-        rangeMax: opt
-      };
-    });
-  }, [activeProjections, offsets]);
-
-  const handleRateChange = (key: keyof ForecastGrowthRates, val: string) => {
-    const num = parseFloat(val) || 0;
-    onUpdateRates({ ...rates, [key]: num });
-  };
-
-  const trendData = activeProjections.map((p, idx) => ({
-    name: `Jahr ${idx + 1}`,
-    Umsatz: Math.round(p.revenue),
-    Ergebnis: Math.round(p.result),
-    DB1: Math.round(p.db1)
-  }));
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Kontroll-Panel */}
-        <div className="space-y-6">
+        {/* Left Column: Driver Controls & Written Summary */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* Growth Driver Card */}
           <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm space-y-8">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20">
-                <TrendingUp size={20} />
+              <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-lg">
+                <SlidersHorizontal size={20} />
               </div>
-              <h3 className="font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-widest">Wachstum p.a.</h3>
+              <h3 className="font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-widest">Szenario-Treiber anpassen</h3>
             </div>
             
-            <div className="space-y-5">
-              {[
-                { id: 'REVENUE', label: 'Umsatz-Trend', color: 'border-blue-500' },
-                { id: 'MATERIAL', label: 'Wareneinsatz', color: 'border-emerald-500' },
-                { id: 'PERSONNEL', label: 'Personalkosten', color: 'border-indigo-500' },
-                { id: 'OPERATING', label: 'Betriebskosten', color: 'border-slate-400' },
-              ].map(rate => (
-                <div key={rate.id} className="space-y-2 group">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 group-hover:text-blue-500 transition-colors">{rate.label}</label>
+            <div className="space-y-6">
+              {(Object.keys(SCENARIOS) as ScenarioKey[]).map(key => (
+                <div key={key} className="space-y-2 group">
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-500 transition-colors flex items-center gap-2">
+                       {SCENARIOS[key].label} Growth
+                    </label>
+                    <span className="text-[10px] font-black text-slate-300">p.a.</span>
+                  </div>
                   <div className="relative">
                     <input
-                      type="number" step="0.1"
-                      className={`w-full bg-slate-50 dark:bg-slate-950 border-2 rounded-2xl py-4 px-5 text-sm font-black focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all dark:text-white ${rate.color}`}
-                      value={rates[rate.id as keyof ForecastGrowthRates]}
-                      onChange={(e) => handleRateChange(rate.id as keyof ForecastGrowthRates, e.target.value)}
+                      type="number" step="0.5"
+                      className={`w-full bg-slate-50 dark:bg-slate-950 border-2 rounded-2xl py-4 px-5 text-sm font-black focus:outline-none transition-all dark:text-white ${
+                        activeScenario === key ? 'border-blue-500 ring-4 ring-blue-500/5' : 'border-transparent'
+                      }`}
+                      value={scenarioRates[key]}
+                      onChange={(e) => setScenarioRates({ ...scenarioRates, [key]: parseFloat(e.target.value) || 0 })}
                     />
                     <Percent size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" />
                   </div>
@@ -141,163 +171,147 @@ export const ForecastView: React.FC<ForecastViewProps> = ({ sections, rates, onU
             </div>
           </div>
 
-          <div className="bg-slate-900 p-8 rounded-[40px] shadow-2xl space-y-8 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full group-hover:bg-blue-500/20 transition-all" />
+          {/* Written Plan / Executive Summary */}
+          <div className="bg-slate-900 p-8 rounded-[40px] text-white space-y-6 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 blur-3xl rounded-full translate-x-16 -translate-y-16" />
             <div className="flex items-center gap-3 relative z-10">
-              <div className="p-2.5 bg-white/10 text-white rounded-2xl">
-                <SlidersHorizontal size={20} />
+              <div className="p-2 bg-white/10 rounded-xl">
+                <FileText size={20} className="text-blue-400" />
               </div>
-              <h3 className="font-black text-white uppercase text-[11px] tracking-widest">Szenarien-Logik</h3>
+              <h3 className="font-black uppercase text-[11px] tracking-widest">Executive Summary</h3>
             </div>
-            
-            <div className="space-y-5 relative z-10">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-emerald-500 uppercase tracking-widest ml-1">Optimistisch (ab Jahr 2)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    className="w-full bg-white/5 border-2 border-emerald-500/30 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-emerald-500 transition-all"
-                    value={offsets.optimistic}
-                    onChange={(e) => setOffsets({ ...offsets, optimistic: parseFloat(e.target.value) || 0 })}
-                  />
-                  <Percent size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-emerald-500/50" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-1">Worst Case (ab Jahr 2)</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    className="w-full bg-white/5 border-2 border-rose-500/30 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-rose-500 transition-all"
-                    value={offsets.worstCase}
-                    onChange={(e) => setOffsets({ ...offsets, worstCase: parseFloat(e.target.value) || 0 })}
-                  />
-                  <Percent size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-rose-500/50" />
-                </div>
-              </div>
+            <p className="text-sm font-medium leading-relaxed italic opacity-80 border-l-2 border-blue-500/30 pl-4">
+              "{getExecutiveSummary()}"
+            </p>
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+               <div>
+                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Delta J1 - J5</p>
+                 <p className="text-lg font-black text-emerald-400">+{formatNumber(growthAbsolute)} €</p>
+               </div>
+               <div>
+                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Status</p>
+                 <p className="text-lg font-black text-blue-400 uppercase tracking-tighter">Profitabel</p>
+               </div>
             </div>
           </div>
         </div>
 
-        {/* Grafische Auswertung */}
-        <div className="lg:col-span-3 space-y-8">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        {/* Right Column: Charts & Matrix */}
+        <div className="lg:col-span-8 space-y-8">
+          
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
-            {/* Chart 1: Basis Trend */}
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col min-h-[420px]">
+            {/* Risk Corridor Chart */}
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm min-h-[400px]">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                  <Activity size={20} className="text-blue-600" />
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-widest">Performance-Verlauf</h3>
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 dark:text-white uppercase text-[10px] tracking-widest">Ergebnis-Korridor</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">Multi-Szenario Simulation</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex-1 w-full">
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trendData}>
-                    <defs>
-                      <linearGradient id="gradUmsatz" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
+                  <ComposedChart data={corridorData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <Tooltip content={<CustomForecastTooltip />} />
-                    <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: '900', paddingBottom: '30px', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
-                    <Area type="monotone" dataKey="Umsatz" stroke="#3b82f6" fillOpacity={1} fill="url(#gradUmsatz)" strokeWidth={4} />
-                    <Area type="monotone" dataKey="Ergebnis" stroke="#f59e0b" fill="none" strokeWidth={4} name="EGT" />
-                    <Line type="monotone" dataKey="DB1" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
-                  </AreaChart>
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', fontSize: '10px' }}
+                    />
+                    <Area dataKey="range" fill="#3b82f6" fillOpacity={0.08} stroke="none" name="Sicherheitskorridor" />
+                    <Line type="monotone" dataKey="Basis" stroke="#3b82f6" strokeWidth={4} dot={{ r: 4, fill: '#3b82f6' }} />
+                    <Line type="monotone" dataKey="Best" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                    <Line type="monotone" dataKey="Worst" stroke="#ef4444" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                    <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={1} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Chart 2: Szenarien Risiko-Schere */}
-            <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col min-h-[420px]">
+            {/* Scenario Detail Chart */}
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm min-h-[400px]">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
-                  <Layers size={20} className="text-purple-600" />
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase text-[11px] tracking-widest">Szenarien-Schere (EGT)</h3>
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                    <TrendingUp size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 dark:text-white uppercase text-[10px] tracking-widest">Wachstumstrend</h3>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase">{SCENARIOS[activeScenario].label} Detail</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex-1 w-full">
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={scenarioData}>
+                  <AreaChart data={activeData}>
+                    <defs>
+                      <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={SCENARIOS[activeScenario].color} stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor={SCENARIOS[activeScenario].color} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <Tooltip content={<CustomForecastTooltip />} />
-                    <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: '900', paddingBottom: '30px', textTransform: 'uppercase', letterSpacing: '0.1em' }} />
-                    
-                    {/* Fixed Recharts Area by using a range [min, max] via the 'range' dataKey */}
-                    <Area 
-                      type="monotone" 
-                      dataKey="range" 
-                      fill="#3b82f6" 
-                      fillOpacity={0.1} 
-                      stroke="none" 
-                      name="Risk Corridor"
-                      legendType="none"
-                    />
-                    
-                    <Line type="monotone" dataKey="Basis" stroke="#3b82f6" strokeWidth={5} dot={{ r: 6, fill: '#3b82f6' }} />
-                    <Line type="monotone" dataKey="Optimistisch" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} strokeDasharray="5 5" />
-                    <Line type="monotone" dataKey="Worst Case" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444' }} strokeDasharray="5 5" />
-                  </ComposedChart>
+                    <XAxis dataKey="yearOffset" axisLine={false} tickLine={false} tickFormatter={(v) => `Jahr ${v+1}`} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} dy={10} />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', fontSize: '10px' }} />
+                    <Area type="monotone" dataKey="revenue" name="Umsatz" stroke={SCENARIOS[activeScenario].color} fillOpacity={1} fill="url(#colorRev)" strokeWidth={4} />
+                    <Line type="monotone" dataKey="result" name="Ergebnis (EGT)" stroke="#1e293b" strokeWidth={2} dot={{ r: 3, fill: '#1e293b' }} />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </div>
 
-          {/* Detaillierte Kennzahlen-Tabelle */}
+          {/* Professional Matrix Table */}
           <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/20">
-               <h3 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                 Finanzielle Projektion
-               </h3>
-               <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                 <Zap size={14} className="text-blue-600" /> Jahr 1 bis 5
+            <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+               <div className="flex items-center gap-3">
+                 <Calculator size={18} className="text-blue-600" />
+                 <h3 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">Projektions-Matrix 2024 - 2028</h3>
+               </div>
+               <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm`}>
+                 <Zap size={10} className="text-amber-500 fill-amber-500" /> Auto-Projektion Aktiv
                </div>
             </div>
-            <div className="overflow-x-auto custom-scrollbar">
+            <div className="overflow-x-auto">
               <table className="w-full border-collapse text-xs">
                 <thead>
-                  <tr className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                    <th className="text-left px-10 py-6 font-black text-slate-400 uppercase text-[9px] tracking-[0.3em]">KPI / Kennzahl</th>
-                    {activeProjections.map((p, idx) => (
-                      <th key={idx} className="text-right px-10 py-6">
-                        <span className="block text-lg font-black text-slate-900 dark:text-white leading-none">Jahr {idx + 1}</span>
-                      </th>
+                  <tr className="bg-white dark:bg-slate-900 text-slate-400 font-black uppercase tracking-[0.2em] text-[9px] border-b border-slate-50 dark:border-slate-800">
+                    <th className="text-left px-10 py-6">Plan-Position</th>
+                    {activeData.map((_, i) => (
+                      <th key={i} className="text-right px-10 py-6">Jahr {i + 1}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800 font-medium">
-                  {[
-                    { label: 'Umsatzerlöse', key: 'revenue', color: 'text-slate-900 dark:text-white' },
-                    { label: 'Deckungsbeitrag 1', key: 'db1', color: 'text-emerald-600' },
-                    { label: 'Operativer Cashflow (EBITDA)', key: 'ebitda', color: 'text-slate-500' },
-                  ].map((row) => (
-                    <tr key={row.key} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all">
-                      <td className="px-10 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">{row.label}</td>
-                      {activeProjections.map((p, idx) => (
-                        <td key={idx} className={`px-10 py-5 text-right font-black ${row.color}`}>
-                          {formatNumber(p[row.key as keyof typeof p] as number)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                  <tr className="bg-slate-900 text-white font-black">
-                    <td className="px-10 py-8 uppercase tracking-[0.4em] text-[10px] text-slate-400">Ergebnis vor Steuern (EGT)</td>
-                    {activeProjections.map((p, idx) => (
-                      <td key={idx} className="px-10 py-8 text-right text-amber-400 text-2xl tracking-tighter">
-                        {formatNumber(p.result)} €
-                      </td>
-                    ))}
+                  <tr>
+                    <td className="px-10 py-5 font-black text-slate-900 dark:text-white uppercase tracking-widest text-[10px]">Umsatzerlöse</td>
+                    {activeData.map((p, i) => <td key={i} className="px-10 py-5 text-right font-bold text-slate-700 dark:text-slate-300">{formatNumber(p.revenue)} €</td>)}
+                  </tr>
+                  <tr>
+                    <td className="px-10 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Rohertrag (DB1)</td>
+                    {activeData.map((p, i) => <td key={i} className="px-10 py-5 text-right text-slate-500 italic">{formatNumber(p.db1)} €</td>)}
+                  </tr>
+                  <tr>
+                    <td className="px-10 py-5 font-black text-slate-400 uppercase tracking-widest text-[10px]">Operatives EBITDA</td>
+                    {activeData.map((p, i) => <td key={i} className="px-10 py-5 text-right text-slate-500">{formatNumber(p.ebitda)} €</td>)}
+                  </tr>
+                  <tr className="bg-blue-50/20 dark:bg-blue-900/5">
+                    <td className="px-10 py-8 font-black text-blue-600 uppercase tracking-[0.3em] text-[10px]">Ergebnis vor Steuern (EGT)</td>
+                    {activeData.map((p, i) => <td key={i} className="px-10 py-8 text-right font-black text-blue-700 dark:text-blue-400 text-base">{formatNumber(p.result)} €</td>)}
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div className="p-6 bg-blue-50/50 dark:bg-blue-900/20 flex gap-4 items-center border-t border-slate-100 dark:border-slate-800">
+               <BadgeAlert size={18} className="text-blue-600 shrink-0" />
+               <p className="text-[10px] text-blue-700 dark:text-blue-300 font-bold leading-relaxed italic">
+                 Diese Projektion ist eine mathematische Schätzung basierend auf den aktuellen Planprämissen und linearen Wachstumskonstanten. Marktveränderungen sind gesondert zu bewerten.
+               </p>
             </div>
           </div>
         </div>

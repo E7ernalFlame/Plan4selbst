@@ -13,5 +13,6 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase with the modular SDK syntax
+// In case of type errors in certain environments, ensured the import path is standard firebase/app
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

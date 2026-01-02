@@ -1,4 +1,3 @@
-
 import { PlanSection, LineItemType, ForecastGrowthRates, SectionType, PlanLineItem } from '../types';
 
 export const sumLineItem = (values: { [month: number]: number }): number => {
@@ -81,9 +80,6 @@ export const calculateKeyFigures = (sections: PlanSection[], month?: number): Ke
   };
 };
 
-/**
- * Verteilt einen Jahreswert gleichmäßig auf 12 Monate.
- */
 export const distributeYearly = (total: number): { [month: number]: number } => {
   const monthly = Math.floor((total / 12) * 100) / 100;
   const values: { [month: number]: number } = {};
@@ -92,32 +88,21 @@ export const distributeYearly = (total: number): { [month: number]: number } => 
     values[i] = monthly;
     distributed += monthly;
   }
-  // Letzter Monat fängt Rundungsdifferenz auf
   values[12] = Math.round((total - distributed) * 100) / 100;
   return values;
 };
 
-/**
- * Passt Monatswerte proportional an einen neuen Jahres-Zielwert an.
- * Erhält die bestehende Saisonalität.
- */
 export const scaleProportionally = (newTotal: number, currentValues: { [month: number]: number }): { [month: number]: number } => {
   const currentTotal = sumLineItem(currentValues);
-  
-  // Wenn der aktuelle Wert 0 ist, können wir nicht proportional skalieren -> klassische Verteilung
   if (currentTotal === 0) return distributeYearly(newTotal);
-
   const ratio = newTotal / currentTotal;
   const newValues: { [month: number]: number } = {};
   let distributed = 0;
-
   for (let i = 1; i <= 11; i++) {
     const newVal = Math.round((currentValues[i] * ratio) * 100) / 100;
     newValues[i] = newVal;
     distributed += newVal;
   }
-  
-  // Letzter Monat fängt Rundungsdifferenz auf
   newValues[12] = Math.round((newTotal - distributed) * 100) / 100;
   return newValues;
 };
@@ -131,35 +116,58 @@ export interface ProjectedYear {
   result: number;
 }
 
+/**
+ * Erstellt eine Mehrjahres-Projektion basierend auf den Planwerten des ersten Jahres
+ * und den definierten Wachstumsraten.
+ */
 export const projectForecast = (sections: PlanSection[], rates: ForecastGrowthRates, years: number = 5): ProjectedYear[] => {
   const baseFigures = calculateKeyFigures(sections);
   const projections: ProjectedYear[] = [];
 
   for (let i = 0; i <= years; i++) {
     const factor = (rate: number) => Math.pow(1 + rate / 100, i);
+    
+    // Revenue Projektion
     const projectedRevenue = baseFigures.revenue * factor(rates.REVENUE);
+    
+    // Variable Kosten Projektion
     const projectedMaterial = baseFigures.material * factor(rates.MATERIAL);
+    
+    // Personalkosten Projektion
     const projectedPersonnel = baseFigures.personnel * factor(rates.PERSONNEL);
+    
+    // Operative Kosten Projektion (Mieten, Marketing, Admin)
     const projectedOperating = baseFigures.operating * factor(rates.OPERATING);
     const projectedAdmin = baseFigures.admin * factor(rates.OPERATING); 
     const projectedSales = baseFigures.sales * factor(rates.OPERATING); 
+    
+    // Zinskosten Projektion
     const projectedFinance = baseFigures.finance * factor(rates.FINANCE);
+    
+    // Abschreibung bleibt typischerweise konstant, sofern keine Neuinvestition geplant
     const projectedDepr = baseFigures.depr;
 
+    // Zwischenergebnisse ableiten
     const db1 = projectedRevenue - projectedMaterial;
     const db2 = db1 - projectedPersonnel;
     const ebit = db2 - (projectedDepr + projectedOperating + projectedAdmin + projectedSales);
     const ebitda = ebit + projectedDepr;
     const egt = ebit - projectedFinance;
+    
+    // Steuer- und SVS-Projektion (vereinfacht auf Steuertrend)
     const projectedSvs = baseFigures.svs * factor(rates.TAX);
     const projectedIncomeTax = baseFigures.incomeTax * factor(rates.TAX);
-    const projectedPrivate = baseFigures.privateWithdrawals;
+    const projectedPrivate = baseFigures.privateWithdrawals; // Privatentnahme meist statisch
+
     const result = egt - projectedSvs - projectedIncomeTax - projectedPrivate;
 
     projections.push({
       yearOffset: i,
       revenue: projectedRevenue,
-      db1, ebitda, egt, result
+      db1,
+      ebitda,
+      egt,
+      result
     });
   }
   return projections;
