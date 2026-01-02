@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef } from 'react';
 import { 
   X, 
@@ -20,8 +21,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 // Always use the recommended named import for GoogleGenAI and Type
-import { GoogleGenAI } from "@google/genai";
-import { Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { SectionType, PlanLineItem, LineItemType } from '../types';
 import { distributeYearly } from '../utils/calculations';
 
@@ -126,14 +126,14 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
 
     try {
       // Create a new GoogleGenAI instance right before making an API call following strict guidelines
-      const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       let contents: any;
 
       if (file.type === 'application/pdf') {
         const base64Data = await fileToBase64(file);
         contents = {
           parts: [{ inlineData: { mimeType: 'application/pdf', data: base64Data } },
-          { text: `Extrahiere Kontonummer, Bezeichnung und Jahreswert. Mappe auf: REVENUE, MATERIAL, PERSONNEL, DEPRECIATION, OPERATING, ADMIN, SALES, FINANCE, TAX_PROVISION.` }]
+          { text: `Extrahiere Kontonummer, Bezeichnung und Jahreswert aus diesem PDF. Mappe jeden Posten auf eine der folgenden Kategorien: REVENUE, MATERIAL, PERSONNEL, DEPRECIATION, OPERATING, ADMIN, SALES, FINANCE, TAX_PROVISION.` }]
         };
       } else {
         const data = await file.arrayBuffer();
@@ -141,11 +141,11 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
         const sampleData = jsonData.slice(0, 200).map(row => row.join(' | ')).join('\n');
-        contents = `Analysiere Excel-Datenzeilen und mappe sie auf österreichisches UGB-Schema. Daten: ${sampleData}`;
+        contents = `Analysiere die folgenden Excel-Datenzeilen und mappe sie auf ein österreichisches UGB-Planungs-Schema. Gib Kontonummer, Bezeichnung, Wert und Ziel-Kategorie (REVENUE, MATERIAL, PERSONNEL, DEPRECIATION, OPERATING, ADMIN, SALES, FINANCE, TAX_PROVISION) zurück.\n\nDaten:\n${sampleData}`;
       }
 
       // Generate content using Gemini 3 Pro for complex extraction
-      const response = await ai.models.generateContent({
+      const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: contents,
         config: {
@@ -170,12 +170,12 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
       });
 
       // Extract text output correctly from the GenerateContentResponse object
-      const results = JSON.parse(response.text || '[]') as MappedRow[];
+      const results = JSON.parse(response.text?.trim() || '[]') as MappedRow[];
       setMappedRows(results.filter(r => r.detectedValue !== 0 && r.originalLabel));
       setStep('mapping');
     } catch (err: any) {
       console.error('AI Error:', err);
-      setError(err.message || "KI-Fehler.");
+      setError(err.message || "Fehler bei der KI-Analyse.");
       setStep('upload');
     }
   };

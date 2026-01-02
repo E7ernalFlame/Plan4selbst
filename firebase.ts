@@ -1,9 +1,10 @@
 // Standard Firebase v9+ modular initialization
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBRWZoTXE2WtUErAM1Zn44_tCgz42bHRBI",
+  // API key is obtained from environment variable as per global security guidelines
+  apiKey: process.env.API_KEY,
   authDomain: "plan4selbst.firebaseapp.com",
   projectId: "plan4selbst",
   storageBucket: "plan4selbst.firebasestorage.app",
@@ -11,6 +12,6 @@ const firebaseConfig = {
   appId: "1:111681838120:web:6dbc77d7aeadd457cce91d"
 };
 
-// Initialize Firebase
+// Initialize Firebase with the modular SDK syntax
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

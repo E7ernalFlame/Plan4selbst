@@ -18,14 +18,14 @@ import {
 export const NAVIGATION_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
   { id: 'planrechnung', label: 'Planrechnung', icon: <BarChart3 size={20} />, path: '/planning' },
+  { id: 'prognose', label: 'Prognose', icon: <Zap size={20} />, path: '/simulation' },
+  { id: 'investition', label: 'Investitionsplanung', icon: <HardHat size={20} />, path: '/investments' },
+  { id: 'kredit', label: 'Kreditrechner', icon: <CreditCard size={20} />, path: '/credit' },
   { id: 'ressourcen', label: 'Einsatz & Ressourcen', icon: <Users2 size={20} />, path: '/resources' },
   { id: 'personal', label: 'Personaleinsatz', icon: <Users size={20} />, path: '/hr' },
   { id: 'entrepreneur', label: 'Unternehmer-Kalk.', icon: <UserCircle2 size={20} />, path: '/entrepreneur' },
   { id: 'tax-calculator', label: 'Steuerrechner 2025', icon: <Coins size={20} />, path: '/tax' },
-  { id: 'investition', label: 'Investitionsplanung', icon: <HardHat size={20} />, path: '/investments' },
-  { id: 'kredit', label: 'Kreditrechner', icon: <CreditCard size={20} />, path: '/credit' },
   { id: 'kreditfaehigkeit', label: 'Kreditfähigkeit', icon: <ShieldCheck size={20} />, path: '/credit-capacity' },
-  { id: 'prognose', label: 'Prognose', icon: <Zap size={20} />, path: '/simulation' },
   { id: 'auswertungen', label: 'Auswertungen', icon: <PieChart size={20} />, path: '/reports' },
   { id: 'einstellungen', label: 'Einstellungen', icon: <Settings size={20} />, path: '/settings' },
 ];

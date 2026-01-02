@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, ChevronRight, ChevronDown, FileSpreadsheet, Calculator, ArrowDown, ArrowUp, Download, Zap, Printer } from 'lucide-react';
+import { Plus, Trash2, ChevronRight, ChevronDown, FileSpreadsheet, Calculator, ArrowDown, ArrowUp, Download, Zap, Printer, Columns } from 'lucide-react';
 import { PlanSection, PlanLineItem, LineItemType, SectionType } from '../types';
 import { formatNumber, parseLocaleNumber } from '../utils/formatting';
 import { sumLineItem, calculateSectionTotal, calculateKeyFigures, distributeYearly, scaleProportionally } from '../utils/calculations';
@@ -16,6 +16,7 @@ interface PlanrechnungTableProps {
 
 export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, onUpdateSections, clientName, year }) => {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [showMonths, setShowMonths] = useState(true);
   const [editingCell, setEditingCell] = useState<{ row: string, col: number | 'year' } | null>(null);
   
   const toggleSection = (id: string) => {
@@ -67,7 +68,6 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
   };
 
   const handleExcelExport = () => {
-    // Erzeuge ein Mock-Analyse-Objekt für den Export-Utility
     const mockAnalysis: any = {
       name: 'Direkt-Export',
       planData: sections
@@ -125,40 +125,50 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
 
   return (
     <div className="bg-white dark:bg-slate-950 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden relative transition-colors duration-300 print:shadow-none print:border-none print:rounded-none">
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/30 dark:bg-slate-900/20 print:hidden">
-        <div className="flex items-center gap-4">
+      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center bg-slate-50/30 dark:bg-slate-900/20 print:hidden gap-4">
+        <div className="flex items-center gap-4 w-full md:w-auto">
            <div className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <Calculator size={14} className="text-blue-600" />
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Planungsmodus Aktiv</span>
            </div>
-           <p className="text-[11px] text-slate-400 font-medium italic">
+           <p className="hidden lg:block text-[11px] text-slate-400 font-medium italic">
              Gesamtjahr ändern skaliert Monate proportional.
            </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={() => setShowMonths(!showMonths)}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${
+              showMonths 
+                ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50' 
+                : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            <Columns size={14} /> {showMonths ? 'Monate ausblenden' : 'Detailansicht'}
+          </button>
           <button 
             onClick={handleExcelExport}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
           >
-            <FileSpreadsheet size={14} /> Excel Download
+            <FileSpreadsheet size={14} /> Excel
           </button>
           <button 
             onClick={handleFullPrint}
             className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white border border-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-sm"
           >
-            <Printer size={14} /> Drucken / PDF
+            <Printer size={14} /> Druck/PDF
           </button>
         </div>
       </div>
 
       <div className="overflow-x-auto custom-scrollbar print:overflow-visible">
-        <table className="w-full border-collapse text-sm table-fixed min-w-[1700px] print:min-w-full">
+        <table className={`w-full border-collapse text-sm table-fixed ${showMonths ? 'min-w-[1700px]' : 'min-w-full'} print:min-w-full transition-all duration-500`}>
           <thead>
             <tr className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 print:bg-slate-50">
               <th className="w-[48px] sticky left-0 z-[60] bg-white dark:bg-slate-950 print:bg-slate-50 print:static"></th>
-              <th className="w-[340px] text-left px-6 py-4 font-black text-slate-400 uppercase tracking-[0.2em] text-[9px] sticky left-[48px] z-[60] bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.02)] print:static print:shadow-none print:w-auto">Bezeichnung / Konto</th>
-              <th className="w-[150px] text-right px-6 py-4 font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] text-[9px] bg-blue-50/20 dark:bg-blue-900/10 border-r border-slate-100 dark:border-slate-800">Jahreswert Σ</th>
-              {MONTH_NAMES.map((name, i) => (
+              <th className={`${showMonths ? 'w-[340px]' : 'w-auto'} text-left px-6 py-4 font-black text-slate-400 uppercase tracking-[0.2em] text-[9px] sticky left-[48px] z-[60] bg-white dark:bg-slate-950 border-r border-slate-100 dark:border-slate-800 shadow-[2px_0_5px_rgba(0,0,0,0.02)] print:static print:shadow-none print:w-auto`}>Bezeichnung / Konto</th>
+              <th className={`${showMonths ? 'w-[150px]' : 'w-64'} text-right px-6 py-4 font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] text-[9px] bg-blue-50/20 dark:bg-blue-900/10 border-r border-slate-100 dark:border-slate-800`}>Jahreswert Σ</th>
+              {showMonths && MONTH_NAMES.map((name, i) => (
                 <th key={i} className={`w-[110px] text-right px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-[9px] border-r border-slate-100/30 dark:border-slate-800/30 ${i % 3 === 2 ? 'border-r-slate-300 dark:border-r-slate-600' : ''}`}>
                   {name}
                 </th>
@@ -187,7 +197,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                   <td className="px-6 py-2 text-right font-black text-slate-900 dark:text-white bg-slate-100/20 dark:bg-slate-800/20 border-r border-slate-100 dark:border-slate-800 text-sm">
                     {formatNumber(calculateSectionTotal(section))}
                   </td>
-                  {Array.from({ length: 12 }).map((_, i) => (
+                  {showMonths && Array.from({ length: 12 }).map((_, i) => (
                     <td key={i} className={`px-4 py-2 text-right font-bold text-slate-400 dark:text-slate-500 text-[11px] border-r border-slate-50 dark:border-slate-900 ${i % 3 === 2 ? 'border-r-slate-200 dark:border-r-slate-800' : ''}`}>
                       {formatNumber(calculateSectionTotal(section, i + 1))}
                     </td>
@@ -205,12 +215,12 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                         <span className="w-10 text-[10px] font-mono text-slate-400 dark:text-slate-500">{item.accountNumber || '----'}</span>
                         <div className="flex items-center gap-2 flex-1">
                           {item.type === LineItemType.Revenue ? <ArrowUp size={10} className="text-emerald-500 print:hidden" /> : <ArrowDown size={10} className="text-red-400 print:hidden" />}
-                          <span className="flex-1 text-[13px] font-semibold text-slate-700 dark:text-slate-300">{item.label}</span>
+                          <span className="flex-1 text-[13px] font-semibold text-slate-700 dark:text-slate-300 truncate">{item.label}</span>
                         </div>
                       </div>
                     </td>
                     <td className="border-r border-slate-50 dark:border-slate-900 p-0 h-11">{renderCell(section.id, item, 'year')}</td>
-                    {Array.from({ length: 12 }).map((_, i) => (
+                    {showMonths && Array.from({ length: 12 }).map((_, i) => (
                       <td key={i} className={`border-r border-slate-50 dark:border-slate-900 p-0 h-11 ${i % 3 === 2 ? 'border-r-slate-200 dark:border-r-slate-800' : ''}`}>
                         {renderCell(section.id, item, i + 1)}
                       </td>
@@ -226,7 +236,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                       Deckungsbeitrag 1 (Marge)
                     </td>
                     <td className="px-6 text-right font-black text-base border-r border-emerald-500">{formatNumber(keyFigures.db1)}</td>
-                    {Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-bold text-xs ${i % 3 === 2 ? 'border-r-emerald-500/50' : ''}`}>{formatNumber(calculateKeyFigures(sections, i+1).db1)}</td>)}
+                    {showMonths && Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-bold text-xs ${i % 3 === 2 ? 'border-r-emerald-500/50' : ''}`}>{formatNumber(calculateKeyFigures(sections, i+1).db1)}</td>)}
                     <td className="print:hidden"></td>
                   </tr>
                 )}
@@ -238,7 +248,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                       Deckungsbeitrag 2
                     </td>
                     <td className="px-6 text-right font-black text-base border-r border-slate-700">{formatNumber(keyFigures.db2)}</td>
-                    {Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-bold text-xs ${i % 3 === 2 ? 'border-r-slate-700' : ''}`}>{formatNumber(calculateKeyFigures(sections, i+1).db2)}</td>)}
+                    {showMonths && Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-bold text-xs ${i % 3 === 2 ? 'border-r-slate-700' : ''}`}>{formatNumber(calculateKeyFigures(sections, i+1).db2)}</td>)}
                     <td className="print:hidden"></td>
                   </tr>
                 )}
@@ -250,7 +260,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                       Operatives Ergebnis (EBIT)
                     </td>
                     <td className="px-6 text-right font-black text-xl border-r border-blue-600">{formatNumber(keyFigures.ebit)}</td>
-                    {Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-black text-sm ${i % 3 === 2 ? 'border-r-blue-600' : ''}`}>{formatNumber(calculateKeyFigures(sections, i + 1).ebit)}</td>)}
+                    {showMonths && Array.from({ length: 12 }).map((_, i) => <td key={i} className={`px-4 text-right font-black text-sm ${i % 3 === 2 ? 'border-r-blue-600' : ''}`}>{formatNumber(calculateKeyFigures(sections, i + 1).ebit)}</td>)}
                     <td className="print:hidden"></td>
                   </tr>
                 )}
@@ -263,7 +273,7 @@ export const PlanrechnungTable: React.FC<PlanrechnungTableProps> = ({ sections, 
                 Netto-Verbleib
               </td>
               <td className="px-6 text-right text-amber-400 font-black text-2xl border-r border-slate-900 print:text-amber-900">{formatNumber(keyFigures.result)}</td>
-              {Array.from({ length: 12 }).map((_, i) => (
+              {showMonths && Array.from({ length: 12 }).map((_, i) => (
                 <td key={i} className={`px-4 text-right font-black text-amber-400/80 text-base ${i % 3 === 2 ? 'border-r-slate-800' : ''} print:text-amber-800`}>
                   {formatNumber(calculateKeyFigures(sections, i + 1).result)}
                 </td>
